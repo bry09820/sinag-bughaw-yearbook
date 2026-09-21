@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NU Lipa Yearbook - Sections</title>
+    <style>
+        :root {
+            --nu-blue: #354e9f;
+            --nu-dark-blue: #0a1128;
+            --nu-light-blue: #eef2ff;
+            --text-gray: #718096;
+            --card-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', -apple-system, sans-serif;
+        }
+
+        body {
+            background-color: #fff;
+        }
+
+        /* --- Navigation Bar --- */
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 8%;
+            border-bottom: 1px solid #edf2f7;
+        }
+
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 30px;
+            list-style: none;
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            color: #4a5568;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .nav-links .active {
+            color: var(--nu-blue);
+            background: #dbeafe;
+            padding: 5px 15px;
+            border-radius: 20px;
+        }
+
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-align: right;
+            font-size: 0.8rem;
+        }
+
+        /* --- Hero Section --- */
+        .hero {
+            background-color: var(--nu-blue);
+            color: white;
+            text-align: center;
+            padding: 80px 20px;
+        }
+
+        .hero h1 {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+        }
+
+        .search-wrapper {
+            max-width: 650px;
+            margin: 30px auto 0;
+            position: relative;
+        }
+
+        .search-wrapper input {
+            width: 100%;
+            padding: 18px 30px;
+            border-radius: 8px;
+            border: none;
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+            font-size: 1rem;
+            backdrop-filter: blur(5px);
+        }
+
+        .search-wrapper input::placeholder {
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        /* --- Main Content --- */
+        .main-content {
+            padding: 50px 8%;
+        }
+
+        .batch-title {
+            text-transform: uppercase;
+            font-size: 1.1rem;
+            color: #2d3748;
+            margin-bottom: 5px;
+        }
+
+        .batch-subtitle {
+            color: var(--text-gray);
+            font-size: 0.9rem;
+            margin-bottom: 40px;
+        }
+
+        /* --- Grid & Cards --- */
+        .sections-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(500px, 1fr));
+            gap: 40px;
+        }
+
+        .section-card {
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: var(--card-shadow);
+            border: 1px solid #f1f1f1;
+        }
+
+        .group-img {
+            width: 100%;
+            height: 140px;
+            background: #a0aec0;
+            object-fit: cover;
+        }
+
+        .card-inner {
+            padding: 0;
+        }
+
+        .advisor-bar {
+            background: #cbd5e0;
+            padding: 8px 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.75rem;
+            color: #4a5568;
+        }
+
+        .advisor-avatar {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: #fff;
+            border: 2px solid white;
+        }
+
+        /* The Overlapping Student Row */
+        .student-stamps {
+            display: flex;
+            justify-content: space-around;
+            padding: 25px 15px;
+            position: relative;
+            background: #fff;
+        }
+
+        .stamp-box {
+            width: 70px;
+            height: 90px;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            position: relative;
+            background: #f7fafc;
+        }
+
+        .stamp-img {
+            width: 50px;
+            height: 65px;
+            background: #cbd5e0;
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .view-all-btn {
+            width: 100%;
+            padding: 15px;
+            background: var(--nu-dark-blue);
+            color: white;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .view-all-btn:hover {
+            background: var(--nu-blue);
+        }
+
+        /* --- Footer --- */
+        footer {
+            background: var(--nu-dark-blue);
+            color: white;
+            padding: 60px 8% 20px;
+            margin-top: 100px;
+        }
+
+        .footer-grid {
+            display: grid;
+            grid-template-columns: 1.5fr 1fr 1fr 1.5fr;
+            gap: 50px;
+            margin-bottom: 40px;
+        }
+
+        .footer-col h4 {
+            margin-bottom: 20px;
+            font-size: 1rem;
+        }
+
+        .footer-col p, .footer-col li {
+            font-size: 0.85rem;
+            color: #a0aec0;
+            list-style: none;
+            margin-bottom: 12px;
+        }
+
+        .copyright {
+            border-top: 1px solid rgba(255,255,255,0.1);
+            padding-top: 20px;
+            text-align: center;
+            font-size: 0.75rem;
+            color: #718096;
+        }
+    </style>
+</head>
+<body>
+
+<nav>
+    <div class="logo-section">
+        <div style="width:35px; height:35px; background:var(--nu-blue); border-radius:5px;"></div>
+        <div>
+            <strong style="display:block; font-size: 0.9rem;">NU Lipa</strong>
+            <small style="color:var(--text-gray); font-size: 0.7rem;">YEARBOOK</small>
+        </div>
+    </div>
+    <ul class="nav-links">
+        <li><a href="#">Home</a></li>
+        <li><a href="#">Directory</a></li>
+        <li><a href="#">Faculty</a></li>
+        <li><a href="#">Gallery</a></li>
+        <li><a href="#" class="active">sections</a></li>
+    </ul>
+    <div class="user-profile">
+        <div>
+            <strong>Alex De La Cruz</strong><br>
+            <span>2024 • BS Computer Science</span>
+        </div>
+        <div style="width:35px; height:35px; background:#ddd; border-radius:50%;"></div>
+    </div>
+</nav>
+
+<section class="hero">
+    <h1>Student sections</h1>
+    <p>Search and connect with students across different programs and batches.</p>
+    <div class="search-wrapper">
+        <input type="text" placeholder="Search by name, program, or ID number...">
+    </div>
+</section>
+
+<main class="main-content">
+    <h2 class="batch-title">Pioneer Batch 2024 - 2025</h2>
+    <p class="batch-subtitle">View students organized by their sections</p>
+
+    <div class="sections-grid">
+        <div class="section-card">
+            <div class="group-img"></div>
+            <div class="advisor-bar">
+                <div class="advisor-avatar"></div>
+                <span>Class Advisor</span>
+            </div>
+            <div class="student-stamps">
+                <div class="stamp-box"><div class="stamp-img"></div></div>
+                <div class="stamp-box"><div class="stamp-img"></div></div>
+                <div class="stamp-box"><div class="stamp-img"></div></div>
+                <div class="stamp-box"><div class="stamp-img"></div></div>
+            </div>
+            <button class="view-all-btn">View All Students</button>
+        </div>
+
+        <div class="section-card">
+            <div class="group-img"></div>
+            <div class="advisor-bar">
+                <div class="advisor-avatar"></div>
+                <span>Class Advisor</span>
+            </div>
+            <div class="student-stamps">
+                <div class="stamp-box"><div class="stamp-img"></div></div>
+                <div class="stamp-box"><div class="stamp-img"></div></div>
+                <div class="stamp-box"><div class="stamp-img"></div></div>
+                <div class="stamp-box"><div class="stamp-img"></div></div>
+            </div>
+            <button class="view-all-btn">View All Students</button>
+        </div>
+        </div>
+</main>
+
+<footer>
+    <div class="footer-grid">
+        <div class="footer-col">
+            <h4>NU Lipa</h4>
+            <p>Celebrating academic excellence and cherished memories. The official digital yearbook platform of National University Lipa.</p>
+        </div>
+        <div class="footer-col">
+            <h4>Quick Links</h4>
+            <li>Student Directory</li>
+            <li>Faculty & Staff</li>
+            <li>Photo Gallery</li>
+            <li>Events Calendar</li>
+        </div>
+        <div class="footer-col">
+            <h4>Support</h4>
+            <li>Help Center</li>
+            <li>Privacy Policy</li>
+            <li>Terms of Service</li>
+            <li>Contact Administrator</li>
+        </div>
+        <div class="footer-col">
+            <h4>Contact Us</h4>
+            <p>📍 Km. 75 JP Laurel Highway, Brgy. Marawoy, Lipa City, Batangas</p>
+            <p>📞 +63 (043) 123 4567</p>
+            <p>✉️ admissions@nu-lipa.edu.ph</p>
+        </div>
+    </div>
+    <div class="copyright">
+        © 2026 National University Lipa. All rights reserved.
+    </div>
+</footer>
+
+</body>
+</html>

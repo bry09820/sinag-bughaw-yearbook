@@ -9,6 +9,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { createAudioPlayer, RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync, useAudioRecorder, useAudioRecorderState } from 'expo-audio';
 import { fetchCurrentUser, getAppConfig, getErrorMessage, getSearchFilters, getStudent, getStudentAchievements, getStudentSuggestions, getStudents, getVoiceNotesForProfile, imageUrl, paginationMeta, searchFace, sendVoiceNote, unwrap } from '../../lib/api';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import UpgradePrompt, { hasPaidAccess } from '../../components/UpgradePrompt';
 
 const { height } = Dimensions.get('window');
 const audioUploadPart = (uri: string) => ({
@@ -140,6 +141,7 @@ export default function DirectoryScreen() {
   const [playingVoiceId, setPlayingVoiceId] = useState<any>(null);
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [upgradeVisible, setUpgradeVisible] = useState(false);
   const [appConfig, setAppConfig] = useState<any>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -149,6 +151,8 @@ export default function DirectoryScreen() {
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(recorder, 300);
   const directoryEnabled = appConfig?.features?.enable_student_directory_search !== false;
+  const premiumEnabled = appConfig?.features?.enable_premium_subscription !== false;
+  const canOpenProfiles = !premiumEnabled || hasPaidAccess(currentUser);
   const ownDirectoryIds = useMemo(() => collectOwnDirectoryIds(currentUser), [currentUser]);
 
   useEffect(() => {
@@ -359,6 +363,10 @@ export default function DirectoryScreen() {
 
   const toggleModal = (visible: boolean, student: any = null) => {
     if (visible) {
+      if (!canOpenProfiles && !isOwnDirectoryEntry(student, ownDirectoryIds)) {
+        setUpgradeVisible(true);
+        return;
+      }
       setSelectedStudent(student);
       setSelectedAchievements([]);
       setVoiceNotes([]);
@@ -521,6 +529,13 @@ export default function DirectoryScreen() {
           const userId = getRecipientId(item);
           const studentRecordId = item?.student_record_id || item?.student?.id || item?.record?.id;
           const profileId = studentRecordId || userId || getStudentId(item);
+          const isOwn = isOwnDirectoryEntry(item, ownDirectoryIds);
+
+          if (!canOpenProfiles && !isOwn) {
+            setUpgradeVisible(true);
+            return;
+          }
+
           if (profileId) {
             router.push({
               pathname: '/student/[id]',
@@ -618,6 +633,24 @@ export default function DirectoryScreen() {
                 <Text style={styles.headerTitle}>Students</Text>
               </View>
             </View>
+
+            {premiumEnabled && !canOpenProfiles ? (
+              <TouchableOpacity
+                style={styles.upgradeBanner}
+                activeOpacity={0.9}
+                onPress={() => setUpgradeVisible(true)}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.upgradeTitle}>Directory profiles locked</Text>
+                  <Text style={styles.upgradeText}>
+                    Free accounts can browse the list. Upgrade to open full student profiles and yearbook details.
+                  </Text>
+                </View>
+                <View style={styles.upgradeButton}>
+                  <Text style={styles.upgradeButtonText}>Upgrade</Text>
+                </View>
+              </TouchableOpacity>
+            ) : null}
 
             <View style={styles.searchArea}>
               <View style={styles.searchContainer}>
@@ -900,6 +933,13 @@ export default function DirectoryScreen() {
           </Animated.View>
         </View>
       </Modal>
+
+      <UpgradePrompt
+        visible={upgradeVisible}
+        onClose={() => setUpgradeVisible(false)}
+        title="Unlock Directory Profiles"
+        featureLabel="full student profiles and directory details"
+      />
     </SafeAreaView>
   );
 }
@@ -910,6 +950,28 @@ const styles = StyleSheet.create({
   directoryHeader: { height: 56, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerKicker: { color: '#F5A623', fontSize: 12, fontWeight: '900', letterSpacing: 1.2, textTransform: 'uppercase' },
   headerTitle: { color: '#1A2547', fontSize: 24, fontWeight: '900', marginTop: 0 },
+  upgradeBanner: {
+    marginHorizontal: 18,
+    marginBottom: 4,
+    marginTop: 4,
+    borderRadius: 16,
+    backgroundColor: '#263187',
+    padding: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  upgradeTitle: { color: '#ffffff', fontSize: 13, fontWeight: '900' },
+  upgradeText: { color: '#d8dff4', fontSize: 11, marginTop: 2 },
+  upgradeButton: {
+    height: 38,
+    borderRadius: 11,
+    backgroundColor: '#fdb813',
+    paddingHorizontal: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  upgradeButtonText: { color: '#102044', fontSize: 11, fontWeight: '900' },
   headerCameraButton: { width: 42, height: 42, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(253,184,19,0.28)' },
   searchArea: { paddingHorizontal: 18, paddingTop: 14 },
   hero: { minHeight: 360, borderBottomLeftRadius: 28, borderBottomRightRadius: 28, overflow: 'hidden' },

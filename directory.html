@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NU Lipa | Student Directory</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --nu-blue: #3F51B5;
+            --nu-dark-blue: #283593;
+            --nu-yellow: #FFD54F;
+            --bg-light: #F4F7FE;
+            --text-main: #333;
+            --text-muted: #778291;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-light);
+            color: var(--text-main);
+            line-height: 1.6;
+        }
+
+        /* --- NAVIGATION --- */
+        .main-nav {
+            background: white;
+            padding: 15px 8%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .nav-logo {
+            font-weight: 800;
+            color: var(--nu-blue);
+            text-decoration: none;
+            font-size: 1.2rem;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .nav-logo span {
+            font-size: 0.65rem;
+            color: #999;
+            letter-spacing: 1px;
+            font-weight: 400;
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            color: #666;
+            margin: 0 15px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: 0.3s;
+        }
+
+        .nav-links a.active {
+            color: var(--nu-blue);
+            font-weight: 700;
+        }
+
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .user-info {
+            text-align: right;
+            line-height: 1.2;
+        }
+
+        .user-name {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: #444;
+        }
+
+        .user-dept {
+            font-size: 0.7rem;
+            color: var(--nu-blue);
+        }
+
+        .avatar-circle {
+            width: 38px;
+            height: 38px;
+            background: #eee;
+            border-radius: 50%;
+            overflow: hidden;
+        }
+
+        .avatar-circle img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* --- HERO HEADER --- */
+        .directory-header {
+            background-color: var(--nu-blue);
+            color: white;
+            padding: 80px 20px;
+            text-align: center;
+        }
+
+        .header-content h1 {
+            font-size: 2.8rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header-content p {
+            font-size: 1.1rem;
+            opacity: 0.85;
+            margin-bottom: 35px;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .search-container {
+            position: relative;
+            max-width: 650px;
+            margin: 0 auto;
+        }
+
+        .search-container input {
+            width: 100%;
+            padding: 18px 30px;
+            border-radius: 50px;
+            border: none;
+            outline: none;
+            font-size: 1rem;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+
+        /* --- FILTERS --- */
+        .filter-wrapper {
+            display: flex;
+            justify-content: center;
+            margin-top: -25px;
+            margin-bottom: 50px;
+        }
+
+        .filters {
+            background: white;
+            padding: 8px;
+            border-radius: 50px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.05);
+            display: flex;
+            gap: 5px;
+        }
+
+        .filter-chip {
+            padding: 10px 25px;
+            border: none;
+            background: transparent;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: 500;
+            color: #777;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+
+        .filter-chip.active {
+            background: var(--nu-blue);
+            color: white;
+        }
+
+        .filter-chip:hover:not(.active) {
+            background: #f0f2f5;
+        }
+
+        /* --- GRID SYSTEM --- */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        .student-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 30px;
+            margin-bottom: 60px;
+        }
+
+        .student-card {
+            background: white;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.04);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            cursor: pointer;
+        }
+
+        .student-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 12px 30px rgba(0,0,0,0.08);
+        }
+
+        .img-container {
+            position: relative;
+            height: 220px;
+        }
+
+        .img-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .batch-tag {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+            padding: 4px 12px;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+
+        .card-body {
+            padding: 22px;
+        }
+
+        .card-body h3 {
+            font-size: 1.15rem;
+            margin-bottom: 4px;
+            color: #222;
+        }
+
+        .card-body p {
+            font-size: 0.85rem;
+            color: var(--nu-blue);
+            font-weight: 500;
+            margin-bottom: 18px;
+        }
+
+        .card-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid #f0f0f0;
+            padding-top: 15px;
+        }
+
+        .nu-dots {
+            display: flex;
+            gap: 6px;
+        }
+
+        .dot {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+        }
+
+        .dot.yellow { background: var(--nu-yellow); }
+        .dot.blue { background: #42A5F5; }
+
+        .view-link {
+            text-decoration: none;
+            font-size: 0.8rem;
+            color: #999;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        /* --- LOAD MORE --- */
+        .load-more-container {
+            text-align: center;
+            margin-bottom: 80px;
+        }
+
+        .load-more-btn {
+            background: white;
+            border: 1px solid #ddd;
+            padding: 12px 40px;
+            border-radius: 8px;
+            font-weight: 600;
+            color: #555;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .load-more-btn:hover {
+            background: #f9f9f9;
+            border-color: #bbb;
+        }
+
+        /* --- FOOTER --- */
+        .nu-footer {
+            background: #0D1117;
+            color: white;
+            padding: 60px 8%;
+        }
+
+        .footer-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1.5fr;
+            gap: 40px;
+        }
+
+        .footer-brand h3 { font-size: 1.5rem; margin-bottom: 15px; }
+        .footer-brand p { font-size: 0.85rem; opacity: 0.6; line-height: 1.6; }
+
+        .footer-col h4 {
+            margin-bottom: 20px;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .footer-col ul { list-style: none; }
+        .footer-col ul li { margin-bottom: 10px; }
+        .footer-col ul li a {
+            color: #888;
+            text-decoration: none;
+            font-size: 0.85rem;
+            transition: 0.3s;
+        }
+
+        .footer-col ul li a:hover { color: white; }
+
+        .contact-info p {
+            font-size: 0.85rem;
+            color: #888;
+            margin-bottom: 10px;
+            display: flex;
+            gap: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .footer-grid { grid-template-columns: 1fr; }
+            .nav-links { display: none; }
+            .header-content h1 { font-size: 2rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="main-nav">
+        <a href="dashboard.html" class="nav-logo">
+            NU LIPA
+            <span>YEARBOOK</span>
+        </a>
+        
+        <div class="nav-links">
+            <a href="dashboard.html">Home</a>
+            <a href="directory.html" class="active">Directory</a>
+            <a href="#">Faculty</a>
+            <a href="#">Gallery</a>
+            <a href="#">Sections</a>
+        </div>
+
+        <div class="user-profile">
+            <div class="user-info">
+                <span class="user-name">Alex De La Cruz</span>
+                <span class="user-dept">2025 • BS Computer Science</span>
+            </div>
+            <div class="avatar-circle">
+                <img src="https://ui-avatars.com/api/?name=Alex+De+La+Cruz&background=3F51B5&color=fff" alt="User">
+            </div>
+        </div>
+    </nav>
+
+    <header class="directory-header">
+        <div class="header-content">
+            <h1>Student Directory</h1>
+            <p>Search and connect with students across different programs and batches.</p>
+            <div class="search-container">
+                <input type="text" placeholder="Search by name, program, or ID number...">
+            </div>
+        </div>
+    </header>
+
+    <div class="filter-wrapper">
+        <div class="filters">
+            <button class="filter-chip active">All</button>
+            <button class="filter-chip">BSCS</button>
+            <button class="filter-chip">BSIT</button>
+            <button class="filter-chip">Engineering</button>
+            <button class="filter-chip">Nursing</button>
+            <button class="filter-chip">Business</button>
+        </div>
+    </div>
+
+    <main class="container">
+        <div class="student-grid">
+            
+            <div class="student-card">
+                <div class="img-container">
+                    <span class="batch-tag">2025</span>
+                    <img src="https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?q=80&w=400&auto=format&fit=crop" alt="Student">
+                </div>
+                <div class="card-body">
+                    <h3>Maria Santos</h3>
+                    <p>BS Accountancy</p>
+                    <div class="card-footer">
+                        <div class="nu-dots">
+                            <span class="dot yellow"></span>
+                            <span class="dot blue"></span>
+                        </div>
+                        <a href="#" class="view-link">View Profile ></a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="student-card">
+                <div class="img-container">
+                    <span class="batch-tag">2026</span>
+                    <img src="https://images.unsplash.com/photo-1522529599102-193c0d76b5b6?q=80&w=400&auto=format&fit=crop" alt="Student">
+                </div>
+                <div class="card-body">
+                    <h3>John Reyes</h3>
+                    <p>BS Information Technology</p>
+                    <div class="card-footer">
+                        <div class="nu-dots">
+                            <span class="dot yellow"></span>
+                            <span class="dot blue"></span>
+                        </div>
+                        <a href="#" class="view-link">View Profile ></a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="student-card">
+                <div class="img-container">
+                    <span class="batch-tag">2024</span>
+                    <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400&auto=format&fit=crop" alt="Student">
+                </div>
+                <div class="card-body">
+                    <h3>Sarah Lim</h3>
+                    <p>BA Communication</p>
+                    <div class="card-footer">
+                        <div class="nu-dots">
+                            <span class="dot yellow"></span>
+                            <span class="dot blue"></span>
+                        </div>
+                        <a href="#" class="view-link">View Profile ></a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="student-card">
+                <div class="img-container">
+                    <span class="batch-tag">2025</span>
+                    <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=400&auto=format&fit=crop" alt="Student">
+                </div>
+                <div class="card-body">
+                    <h3>Miguel Tan</h3>
+                    <p>BS Civil Engineering</p>
+                    <div class="card-footer">
+                        <div class="nu-dots">
+                            <span class="dot yellow"></span>
+                            <span class="dot blue"></span>
+                        </div>
+                        <a href="#" class="view-link">View Profile ></a>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="load-more-container">
+            <button class="load-more-btn">Load More Students</button>
+        </div>
+    </main>
+
+    <footer class="nu-footer">
+        <div class="footer-grid">
+            <div class="footer-brand">
+                <h3>NU Lipa</h3>
+                <p>Celebrating academic excellence and cherished memories. The official digital yearbook platform of National University Lipa.</p>
+            </div>
+            <div class="footer-col">
+                <h4>Quick Links</h4>
+                <ul>
+                    <li><a href="#">Student Directory</a></li>
+                    <li><a href="#">Faculty & Staff</a></li>
+                    <li><a href="#">Photo Gallery</a></li>
+                    <li><a href="#">Events Calendar</a></li>
+                </ul>
+            </div>
+            <div class="footer-col">
+                <h4>Support</h4>
+                <ul>
+                    <li><a href="#">Help Center</a></li>
+                    <li><a href="#">Privacy Policy</a></li>
+                    <li><a href="#">Terms of Service</a></li>
+                </ul>
+            </div>
+            <div class="footer-col contact-info">
+                <h4>Contact Us</h4>
+                <p>📍 Km. 78 JP Laurel Highway, Brgy. Marawoy, Lipa City, Batangas</p>
+                <p>📞 +63 (043) 123 4567</p>
+                <p>✉️ admissions@nu-lipa.edu.ph</p>
+            </div>
+        </div>
+        <div style="text-align: center; margin-top: 50px; opacity: 0.3; font-size: 0.7rem;">
+            © 2026 National University Lipa. All rights reserved.
+        </div>
+    </footer>
+
+</body>
+</html>

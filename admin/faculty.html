@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Faculty | NU Admin Portal</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Saktong kulay mula sa Figma mo, bro */
+            --sidebar-bg: #0F172A;
+            --iris-blue: #3F51B5;
+            --bg-light: #F1F5F9; /* Light blue/gray background */
+            --text-main: #1E293B;
+            --text-muted: #64748B;
+            --white: #ffffff;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            display: flex;
+            min-height: 100vh;
+            background-color: var(--bg-light);
+            color: var(--text-main);
+        }
+
+        /* --- SIDEBAR (Ito yung dark navy side) --- */
+        .sidebar {
+            width: 260px;
+            background-color: var(--sidebar-bg);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            height: 100vh;
+            z-index: 100;
+        }
+
+        .sidebar-header {
+            padding: 30px 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .sidebar-header i {
+            background: var(--iris-blue);
+            padding: 8px;
+            border-radius: 8px;
+            font-size: 18px;
+        }
+
+        .nav-links {
+            list-style: none;
+            padding: 0 16px;
+            flex: 1;
+            margin: 0;
+        }
+
+        .nav-item {
+            padding: 12px 16px;
+            margin-bottom: 4px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: #94A3B8;
+            text-decoration: none;
+            font-size: 14px;
+            transition: 0.3s;
+        }
+
+        /* Saktong active state sa Faculty menu item */
+        .nav-item.active {
+            background-color: var(--iris-blue);
+            color: white;
+            font-weight: 500;
+        }
+
+        .nav-item:hover:not(.active) {
+            background-color: rgba(255,255,255,0.05);
+            color: white;
+        }
+
+        .sign-out {
+            margin: 20px 16px;
+            padding: 12px 16px;
+            color: #F87171;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        /* --- MAIN CONTENT AREA --- */
+        .main-content {
+            margin-left: 260px; /* Offset para sa fixed sidebar */
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- TOP HEADER (Yung may date at profile) --- */
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 30px;
+            background-color: var(--bg-light);
+        }
+
+        .date-info {
+            font-size: 14px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .user-pill {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: white;
+            padding: 8px 16px;
+            border-radius: 50px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .user-info {
+            text-align: right;
+        }
+
+        .user-info span {
+            display: block;
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .user-info small {
+            color: var(--text-muted);
+            font-size: 10px;
+            text-transform: uppercase;
+        }
+
+        /* --- UNDER CONSTRUCTION CONTENT --- */
+        .page-content {
+            flex: 1;
+            padding: 30px;
+            background-color: var(--white); /* White content area */
+            margin: 0 30px 30px 30px;
+            border-radius: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center; /* Gitnang-gitna */
+            text-align: center;
+        }
+
+        .page-header {
+            align-self: flex-start; /* Title stays at the top left */
+            width: 100%;
+            margin-bottom: 20px;
+        }
+
+        .page-header h1 {
+            margin: 0;
+            font-size: 28px;
+            color: var(--text-main);
+        }
+
+        .page-header p {
+            color: var(--text-muted);
+            font-size: 14px;
+            margin: 5px 0 0 0;
+        }
+
+        /* Ang "Under Construction" central state */
+        .construction-state {
+            color: #CBD5E1; /* Light gray color para sa icon at text */
+        }
+
+        .construction-state i {
+            font-size: 64px; /* Malaking gear icon */
+            margin-bottom: 20px;
+        }
+
+        .construction-state h2 {
+            font-size: 20px;
+            font-weight: 600;
+            margin: 0;
+            color: #94A3B8; /* Bahagyang mas madilim sa icon */
+        }
+
+        .construction-state p {
+            font-size: 14px;
+            color: var(--text-muted);
+            margin: 10px 0 0 0;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <i class="fas fa-graduation-cap"></i>
+            <span style="font-weight: 700; font-size: 18px;">NU Admin Portal</span>
+        </div>
+        <ul class="nav-links">
+            <a href="#" class="nav-item"><i class="fas fa-th-large"></i> Dashboard</a>
+            <a href="#" class="nav-item"><i class="fas fa-users"></i> Student Profiles</a>
+            <a href="#" class="nav-item active"><i class="fas fa-user-tie"></i> Faculty</a>
+            <a href="#" class="nav-item"><i class="fas fa-images"></i> Content & Gallery</a>
+            <a href="#" class="nav-item"><i class="fas fa-history"></i> Audit Logs</a>
+            <a href="#" class="nav-item"><i class="fas fa-cog"></i> System Settings</a>
+        </ul>
+        <a href="#" class="sign-out"><i class="fas fa-sign-out-alt"></i> Sign Out</a>
+    </div>
+
+    <div class="main-content">
+        <header class="header-top">
+            <div class="date-info">Wednesday, February 4, 2026</div>
+            <div class="user-pill">
+                <div class="user-info">
+                    <span>Admin User</span>
+                    <small>SUPER ADMINISTRATOR</small>
+                </div>
+                <img src="https://ui-avatars.com/api/?name=Admin+User&background=3F51B5&color=fff" width="35" style="border-radius: 50%;">
+            </div>
+        </header>
+
+        <div class="page-content">
+            <div class="page-header">
+                <h1>Faculty</h1>
+                <p>Manage your yearbook system data efficiently.</p>
+            </div>
+            
+            <div class="construction-state">
+                <i class="fas fa-cog fa-spin"></i> <h2>Module Under Construction</h2>
+                <p>The faculty module is coming soon.</p>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

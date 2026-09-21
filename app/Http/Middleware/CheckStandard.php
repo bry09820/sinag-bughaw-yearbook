@@ -26,7 +26,9 @@ class CheckStandard
         if (! $sub || ! $sub->isStandard()) {
             return response()->json([
                 'message'     => 'A subscription is required to access this feature.',
-                'upgrade_url' => '/payment',
+                'upgrade_url' => '/premium',
+                'subscription_status' => 'free',
+                'required_tier' => 'standard',
             ], 402);
         }
 

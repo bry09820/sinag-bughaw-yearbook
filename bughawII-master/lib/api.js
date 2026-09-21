@@ -888,8 +888,13 @@ export const getDiscoveryStudent = async (id) => {
 };
 
 export const createPaymentIntent = async (plan, redirectUrls = {}) => {
-  const response = await api.post("/payments/create-intent", { plan, ...redirectUrls });
-  return response.data;
+  try {
+    const response = await api.post("/billing/checkout", { plan, redirect: false, ...redirectUrls });
+    return response.data;
+  } catch {
+    const response = await api.post("/payments/create-intent", { plan, ...redirectUrls });
+    return response.data;
+  }
 };
 
 export const confirmPayment = async (sessionId) => {

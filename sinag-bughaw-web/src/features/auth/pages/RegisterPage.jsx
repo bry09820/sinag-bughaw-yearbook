@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authApi } from '@/api/auth.api';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 import ConsentModal from '../components/ConsentModal';
 
 // Must match backend User::DEPARTMENT_COURSES exactly
@@ -73,6 +74,7 @@ function useDebounce(fn, delay) {
 
 export default function RegisterPage() {
   const navigate = useNavigate();
+  const { setToken, fetchUser } = useAuth();
 
   // Steps: 'form' 'otp'
   const [step, setStep] = useState('form');
@@ -199,8 +201,10 @@ export default function RegisterPage() {
         consent_accepted: true,
       });
 
-      localStorage.setItem('sb_token', data.access_token);
-      await authApi.sendOtp(form.email);
+      // No token until OTP is verified. Backend already emailed the code.
+      if (data.email_send_failed) {
+        setSubmitError(data.message || 'Account created, but the verification email failed. Please resend.');
+      }
       setStep('otp');
       setResendTimer(60);
     } catch (err) {
@@ -242,7 +246,10 @@ export default function RegisterPage() {
     setSubmitError('');
     setLoading(true);
     try {
-      await authApi.verifyOtp(form.email, code);
+      const { data } = await authApi.verifyOtp(form.email, code);
+      const token = data.access_token || data.token;
+      if (token) await setToken(token);
+      else await fetchUser();
       setShowConsent(true);
     } catch (err) {
       setSubmitError(err.response?.data?.message || 'Invalid or expired OTP.');
@@ -316,7 +323,14 @@ export default function RegisterPage() {
         @keyframes float      { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
       `}</style>
 
-      {showConsent && <ConsentModal onAccepted={() => navigate('/dashboard')} />}
+      {showConsent && (
+        <ConsentModal
+          onAccepted={async () => {
+            try { await fetchUser(); } catch (_) {}
+            navigate('/dashboard', { replace: true });
+          }}
+        />
+      )}
 
       {/* LEFT PANEL */}
       <div

@@ -924,7 +924,7 @@ export default function BatchmatesPage() {
               </p>
             </div>
           </div>
-          <Link to="/payment" className="no-underline font-bold text-xs px-5 py-3 rounded-xl whitespace-nowrap bg-[#fdb813] text-[#1d2b4b]">
+          <Link to="/premium" className="no-underline font-bold text-xs px-5 py-3 rounded-xl whitespace-nowrap bg-[#fdb813] text-[#1d2b4b]">
             Upgrade Now <i className="fas fa-arrow-right ml-1" />
           </Link>
         </div>

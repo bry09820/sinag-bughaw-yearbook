@@ -16,8 +16,16 @@ class BrevoMailService
     public function __construct()
     {
         $this->apiKey = config('brevo.api_key');
-        $this->fromAddress = (string) config('brevo.from_address');
-        $this->fromName = (string) config('brevo.from_name', 'Sinag-Bughaw');
+        $this->fromAddress = (string) (
+            config('brevo.from_address')
+            ?: config('mail.from.address')
+            ?: ''
+        );
+        $this->fromName = (string) (
+            config('brevo.from_name')
+            ?: config('mail.from.name')
+            ?: 'Sinag-Bughaw'
+        );
     }
 
     public function sendOtp(string $toEmail, string $toName, string $otp): bool
@@ -201,11 +209,75 @@ class BrevoMailService
         string $textContent,
         string $context
     ): bool {
-        if (! $this->apiKey || ! $this->fromAddress) {
-            Log::error("Brevo {$context} error: missing BREVO_API_KEY or BREVO_FROM_ADDRESS.");
+        $mailer = (string) config('mail.default', 'log');
+
+        // Prefer Laravel mail config (log / smtp / brevo / failover).
+        if (in_array($mailer, ['log', 'smtp', 'brevo', 'failover'], true)) {
+            if ($this->sendViaLaravelMailer($toEmail, $toName, $subject, $htmlContent, $textContent, $context, $mailer)) {
+                return true;
+            }
+
+            // Never leave OTP delivery completely dead during local/mobile testing.
+            if ($mailer !== 'log' && $this->sendViaLaravelMailer($toEmail, $toName, $subject, $htmlContent, $textContent, $context, 'log')) {
+                Log::warning("Mail ({$context}) fell back to log driver for {$toEmail}");
+                return true;
+            }
+
             return false;
         }
 
+        if (! $this->fromAddress) {
+            Log::error("Brevo {$context} error: missing BREVO_FROM_ADDRESS / MAIL_FROM_ADDRESS.");
+            return false;
+        }
+
+        if ($this->apiKey && $this->sendViaApi($toEmail, $toName, $subject, $htmlContent, $textContent, $context)) {
+            return true;
+        }
+
+        return $this->sendViaSmtp($toEmail, $toName, $subject, $htmlContent, $textContent, $context);
+    }
+
+    private function sendViaLaravelMailer(
+        string $toEmail,
+        string $toName,
+        string $subject,
+        string $htmlContent,
+        string $textContent,
+        string $context,
+        ?string $mailerName = null
+    ): bool {
+        try {
+            $mailerName = $mailerName ?: (string) config('mail.default', 'log');
+            $fromAddress = $this->fromAddress
+                ?: (string) config('mail.from.address', 'noreply@localhost');
+            $fromName = $this->fromName
+                ?: (string) config('mail.from.name', 'Sinag-Bughaw');
+
+            \Illuminate\Support\Facades\Mail::mailer($mailerName)
+                ->html($htmlContent, function ($message) use ($toEmail, $toName, $subject, $textContent, $fromAddress, $fromName) {
+                    $message->to($toEmail, $toName)
+                        ->from($fromAddress, $fromName)
+                        ->subject($subject)
+                        ->text($textContent);
+                });
+
+            Log::info("Mail ({$context}) sent via [{$mailerName}] to {$toEmail}: {$textContent}");
+            return true;
+        } catch (\Throwable $e) {
+            Log::error("Mail ({$context}) via [{$mailerName}] failed: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    private function sendViaApi(
+        string $toEmail,
+        string $toName,
+        string $subject,
+        string $htmlContent,
+        string $textContent,
+        string $context
+    ): bool {
         try {
             $response = Http::timeout(15)
                 ->withHeaders([
@@ -231,10 +303,40 @@ class BrevoMailService
                 return true;
             }
 
-            Log::error("Brevo {$context} error: {$response->status()} {$response->body()}");
+            Log::warning("Brevo {$context} API error: {$response->status()} {$response->body()} — trying SMTP fallback");
             return false;
         } catch (\Throwable $e) {
-            Log::error("Brevo {$context} exception: " . $e->getMessage());
+            Log::warning("Brevo {$context} API exception: " . $e->getMessage() . ' — trying SMTP fallback');
+            return false;
+        }
+    }
+
+    private function sendViaSmtp(
+        string $toEmail,
+        string $toName,
+        string $subject,
+        string $htmlContent,
+        string $textContent,
+        string $context
+    ): bool {
+        $smtp = config('brevo.smtp', []);
+        if (empty($smtp['username']) || empty($smtp['password'])) {
+            Log::error("Brevo {$context} SMTP fallback unavailable: missing BREVO_USERNAME/BREVO_PASSWORD.");
+            return false;
+        }
+
+        try {
+            \Illuminate\Support\Facades\Mail::mailer('brevo')->html($htmlContent, function ($message) use ($toEmail, $toName, $subject, $textContent) {
+                $message->to($toEmail, $toName)
+                    ->from($this->fromAddress, $this->fromName)
+                    ->subject($subject)
+                    ->text($textContent);
+            });
+
+            Log::info("Brevo {$context} sent via SMTP to {$toEmail}");
+            return true;
+        } catch (\Throwable $e) {
+            Log::error("Brevo {$context} SMTP exception: " . $e->getMessage());
             return false;
         }
     }

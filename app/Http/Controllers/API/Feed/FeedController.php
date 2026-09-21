@@ -27,16 +27,17 @@ class FeedController extends Controller
 
         $query = Photo::query()
             ->with([
-                'user:id,name,first_name,last_name,profile_picture,batch_id,student_record_id',
+                'user' => function ($q) {
+                    $q->select('id', 'name', 'first_name', 'last_name', 'profile_picture', 'batch_id', 'student_record_id')
+                        ->withCount([
+                            'photos as feed_posts_count' => fn ($photo) => $photo->where('status', 'approved'),
+                            'taggedPhotos as feed_tagged_count' => fn ($tag) => $tag->where('status', 'approved'),
+                        ]);
+                },
                 'user.studentRecord:id,course,photo',
                 'taggedStudents:id,name,first_name,last_name,student_record_id',
                 'taggedStudents.studentRecord:id,course,photo',
                 'media',
-            ])
-
-            ->withCount([
-                'user as user_posts_count' => fn($q) => $q->where('status', 'approved'),
-                'user as user_tagged_count' => fn($q) => $q->where('status', 'approved'),
             ])
             ->where('status', 'approved');
 
@@ -166,8 +167,8 @@ class FeedController extends Controller
                 'name'            => $this->displayName($photo->user),
                 'course'          => $photo->user->course,
                 'profile_picture' => $photo->user->profile_picture,
-                'posts_count'     => (int) ($photo->user_posts_count ?? 0),
-                'tagged_count'    => (int) ($photo->user_tagged_count ?? 0),
+                'posts_count'     => (int) ($photo->user->feed_posts_count ?? 0),
+                'tagged_count'    => (int) ($photo->user->feed_tagged_count ?? 0),
             ]
             : null;
 

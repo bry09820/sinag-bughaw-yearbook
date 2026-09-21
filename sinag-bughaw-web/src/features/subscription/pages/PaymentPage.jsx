@@ -75,13 +75,21 @@ export default function PaymentPage() {
     setPaying(true);
     setError('');
     try {
-      const { data } = await paymentsApi.createIntent(plan);
+      // Prefer /api/billing/checkout; fall back to create-intent
+      let data;
+      try {
+        ({ data } = await paymentsApi.checkout(plan));
+      } catch {
+        ({ data } = await paymentsApi.createIntent(plan));
+      }
       if (data.checkout_url) {
         if (data.session_id) {
           localStorage.setItem('pending_paymongo_session_id', data.session_id);
         }
         window.location.href = data.checkout_url;
+        return;
       }
+      setError('Checkout URL was not returned. Please try again.');
     } catch (err) {
       setError(err.response?.data?.message || 'Payment failed. Please try again.');
     } finally {

@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard | NU Admin Portal</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --sidebar-bg: #0F172A; /* Dark Navy from Figma */
+            --iris-blue: #3F51B5;
+            --bg-light: #F8FAFC;
+            --text-main: #1E293B;
+            --text-muted: #64748B;
+            --white: #ffffff;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            display: flex;
+            background-color: var(--bg-light);
+            color: var(--text-main);
+        }
+
+        /* --- SIDEBAR --- */
+        .sidebar {
+            width: 260px;
+            background-color: var(--sidebar-bg);
+            height: 100vh;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+        }
+
+        .sidebar-header {
+            padding: 30px 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .sidebar-header i {
+            background: var(--iris-blue);
+            padding: 8px;
+            border-radius: 8px;
+        }
+
+        .nav-links {
+            list-style: none;
+            padding: 0 16px;
+            flex: 1;
+        }
+
+        .nav-item {
+            padding: 12px 16px;
+            margin-bottom: 4px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: #94A3B8;
+            text-decoration: none;
+            font-size: 14px;
+            transition: 0.3s;
+        }
+
+        .nav-item.active {
+            background-color: var(--iris-blue);
+            color: white;
+        }
+
+        .nav-item:hover:not(.active) {
+            background-color: rgba(255,255,255,0.05);
+            color: white;
+        }
+
+        .sign-out {
+            margin: 20px 16px;
+            padding: 12px 16px;
+            color: #F87171;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        /* --- MAIN CONTENT --- */
+        .main-content {
+            margin-left: 260px;
+            flex: 1;
+            padding: 30px;
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .date-info { font-size: 14px; color: var(--text-muted); font-weight: 500; }
+
+        .user-pill {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: white;
+            padding: 6px 16px;
+            border-radius: 50px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .user-info span { display: block; font-size: 12px; font-weight: 700; }
+        .user-info small { color: var(--text-muted); font-size: 10px; text-transform: uppercase; }
+
+        .dashboard-title h1 { margin: 0; font-size: 28px; }
+        .dashboard-title p { color: var(--text-muted); font-size: 14px; margin: 5px 0 25px 0; }
+
+        /* --- STATS GRID --- */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 24px;
+            border-radius: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+        }
+
+        .stat-info p { margin: 0; font-size: 13px; color: var(--text-muted); }
+        .stat-info h2 { margin: 8px 0; font-size: 24px; }
+        .stat-info .trend { font-size: 11px; color: #10B981; font-weight: 600; }
+
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 20px;
+        }
+
+        /* --- BOTTOM GRID --- */
+        .bottom-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+        }
+
+        .chart-container, .activity-container {
+            background: white;
+            padding: 24px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+        }
+
+        .chart-placeholder {
+            width: 100%;
+            height: 250px;
+            background: #fdfdfd;
+            border: 1px dashed #e2e8f0;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 20px;
+            color: #cbd5e1;
+        }
+
+        .activity-list {
+            list-style: none;
+            padding: 0;
+            margin-top: 20px;
+        }
+
+        .activity-item {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+            font-size: 13px;
+        }
+
+        .activity-item i { font-size: 10px; margin-top: 4px; }
+        .activity-item .time { color: var(--text-muted); font-size: 11px; }
+
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <i class="fas fa-graduation-cap"></i>
+            <span style="font-weight: 700; font-size: 18px;">NU Admin Portal</span>
+        </div>
+        <ul class="nav-links">
+            <a href="#" class="nav-item active"><i class="fas fa-th-large"></i> Dashboard</a>
+            <a href="#" class="nav-item"><i class="fas fa-users"></i> Student Profiles</a>
+            <a href="#" class="nav-item"><i class="fas fa-user-tie"></i> Faculty</a>
+            <a href="#" class="nav-item"><i class="fas fa-images"></i> Content & Gallery</a>
+            <a href="#" class="nav-item"><i class="fas fa-history"></i> Audit Logs</a>
+            <a href="#" class="nav-item"><i class="fas fa-cog"></i> System Settings</a>
+        </ul>
+        <a href="#" class="sign-out"><i class="fas fa-sign-out-alt"></i> Sign Out</a>
+    </div>
+
+    <div class="main-content">
+        <header class="header-top">
+            <div class="date-info">Wednesday, February 4, 2026</div>
+            <div class="user-pill">
+                <div class="user-info">
+                    <span>Admin User</span>
+                    <small>Super Administrator</small>
+                </div>
+                <img src="https://ui-avatars.com/api/?name=Admin+User&background=3F51B5&color=fff" width="35" style="border-radius: 50%;">
+            </div>
+        </header>
+
+        <div class="dashboard-title">
+            <h1>Dashboard</h1>
+            <p>Manage your yearbook system data efficiently.</p>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-info">
+                    <p>Total Students</p>
+                    <h2>4,250</h2>
+                    <span class="trend">+12% last month</span>
+                </div>
+                <div class="stat-icon" style="background: #3F51B5;"><i class="fas fa-users"></i></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-info">
+                    <p>Faculty Members</p>
+                    <h2>320</h2>
+                    <span class="trend">+5% last month</span>
+                </div>
+                <div class="stat-icon" style="background: #A855F7;"><i class="fas fa-user-tie"></i></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-info">
+                    <p>Gallery Photos</p>
+                    <h2>12,500</h2>
+                    <span class="trend" style="color:#EAB308;">+120 last month</span>
+                </div>
+                <div class="stat-icon" style="background: #EAB308;"><i class="fas fa-image"></i></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-info">
+                    <p>System Alerts</p>
+                    <h2>3</h2>
+                    <span class="trend" style="color:#EF4444;">2 last month</span>
+                </div>
+                <div class="stat-icon" style="background: #EF4444;"><i class="fas fa-exclamation-triangle"></i></div>
+            </div>
+        </div>
+
+        <div class="bottom-grid">
+            <div class="chart-container">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <h3 style="margin:0; font-size:16px;">Enrollment Analytics</h3>
+                    <button style="border:none; background:none; color:var(--text-muted); cursor:pointer;"><i class="fas fa-download"></i> Report</button>
+                </div>
+                <div class="chart-placeholder">
+                    [ Enrollment Chart Visualization ]
+                </div>
+            </div>
+            <div class="activity-container">
+                <h3 style="margin:0; font-size:16px;">Recent Audit Activity</h3>
+                <ul class="activity-list">
+                    <li class="activity-item">
+                        <i class="fas fa-circle" style="color:#10B981;"></i>
+                        <div>
+                            <strong>User Login</strong><br>
+                            <small>Admin_super • <span class="time">Just now</span></small>
+                        </div>
+                    </li>
+                    <li class="activity-item">
+                        <i class="fas fa-circle" style="color:#3F51B5;"></i>
+                        <div>
+                            <strong>Update Student</strong><br>
+                            <small>editor_jane • <span class="time">5 mins ago</span></small>
+                        </div>
+                    </li>
+                    <li class="activity-item">
+                        <i class="fas fa-circle" style="color:#EF4444;"></i>
+                        <div>
+                            <strong>Failed Login</strong><br>
+                            <small>unknown • <span class="time">2 hrs ago</span></small>
+                        </div>
+                    </li>
+                </ul>
+                <a href="#" style="font-size:12px; color:var(--iris-blue); text-decoration:none; font-weight:600;">View Full Log</a>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

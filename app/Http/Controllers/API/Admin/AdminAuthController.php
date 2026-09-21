@@ -12,6 +12,8 @@ use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
@@ -75,6 +77,11 @@ class AdminAuthController extends Controller
 
         $setup = null;
         if ($setupRequired) {
+            // Drop undecryptable ciphertext so later Eloquent saves do not 500
+            // while comparing dirty encrypted attributes (DecryptException / invalid MAC).
+            $this->clearUndecryptableAttribute($admin, 'totp_secret');
+            $this->clearUndecryptableAttribute($admin, 'totp_pending_secret');
+
             $secret = $this->encryptedAdminValue($admin, 'totp_pending_secret') ?: $this->totp->generateSecret();
             $admin->forceFill(['totp_pending_secret' => $secret])->save();
             $setup = [
@@ -121,7 +128,7 @@ class AdminAuthController extends Controller
 
         $challenge = (string) $request->input('challenge');
         $cacheKey = "admin_totp_challenge:{$challenge}";
-        $payload = Cache::pull($cacheKey);
+        $payload = Cache::get($cacheKey);
 
         if (! is_array($payload) || empty($payload['admin_id'])) {
             return response()->json(['message' => 'Invalid or expired authenticator challenge.'], 422);
@@ -129,6 +136,8 @@ class AdminAuthController extends Controller
 
         $admin = Admin::whereKey($payload['admin_id'])->where('is_active', true)->first();
         if (! $admin) {
+            Cache::forget($cacheKey);
+
             return response()->json(['message' => 'Admin account is unavailable.'], 403);
         }
 
@@ -148,12 +157,10 @@ class AdminAuthController extends Controller
         }
 
         if ($setupRequired) {
-            $admin->forceFill([
-                'totp_secret' => $secret,
-                'totp_pending_secret' => null,
-                'totp_enabled_at' => now(),
-            ])->save();
+            $this->activateTotpSecret($admin, $secret);
         }
+
+        Cache::forget($cacheKey);
 
         $admin->tokens()->delete();
         $admin->update(['last_login_at' => now(), 'last_seen_at' => now()]);
@@ -226,5 +233,48 @@ class AdminAuthController extends Controller
         }
 
         return is_string($value) && $value !== '' ? $value : null;
+    }
+
+    /**
+     * Promote a verified pending TOTP secret without Eloquent dirty-checks
+     * decrypting any prior corrupt totp_secret ciphertext.
+     */
+    private function activateTotpSecret(Admin $admin, string $secret): void
+    {
+        DB::table('admins')->where('id', $admin->id)->update([
+            'totp_secret' => Crypt::encryptString($secret),
+            'totp_pending_secret' => null,
+            'totp_enabled_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $admin->refresh();
+    }
+
+    /**
+     * Null out encrypted columns that cannot be decrypted with the current APP_KEY
+     * so subsequent model saves do not throw DecryptException during dirty checks.
+     */
+    private function clearUndecryptableAttribute(Admin $admin, string $attribute): void
+    {
+        $raw = $admin->getRawOriginal($attribute);
+
+        if ($raw === null || $raw === '') {
+            return;
+        }
+
+        if ($this->encryptedAdminValue($admin, $attribute) !== null) {
+            return;
+        }
+
+        DB::table('admins')->where('id', $admin->id)->update([
+            $attribute => null,
+            'updated_at' => now(),
+        ]);
+
+        $attributes = $admin->getAttributes();
+        $attributes[$attribute] = null;
+        $admin->setRawAttributes($attributes);
+        $admin->syncOriginalAttribute($attribute);
     }
 }

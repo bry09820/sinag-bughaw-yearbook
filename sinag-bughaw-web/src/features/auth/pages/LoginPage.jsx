@@ -18,7 +18,7 @@ const maskEmail = (value) => {
 };
 
 export default function LoginPage() {
-  const { loginCredentials, fetchUser } = useAuth();
+  const { loginCredentials, setToken } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -46,8 +46,11 @@ export default function LoginPage() {
   const handleLoginSubmit = async (e) => {
     e.preventDefault(); setError(''); setLoading(true);
     try {
-      await loginCredentials(email, password);
-      await authApi.sendOtp(email);
+      // Credentials only — token is issued after OTP verification.
+      const data = await loginCredentials(email, password);
+      if (data?.email_send_failed) {
+        setError(data.message || 'We could not send the verification email. Please use Resend.');
+      }
       setStep('otp'); setResendTimer(60);
     } catch (err) {
       setError(err.response?.data?.message || 'Invalid credentials. Please try again.');
@@ -73,10 +76,12 @@ export default function LoginPage() {
     if (code.length < 6) { setError('Please enter all 6 digits.'); return; }
     setError(''); setLoading(true);
     try {
-      await authApi.verifyOtp(email, code);
-      await fetchUser();
-      const { data } = await consentApi.status();
-      if (!data.accepted) setShowConsent(true);
+      const { data } = await authApi.verifyOtp(email, code);
+      const token = data.access_token || data.token;
+      if (!token) throw new Error('Missing access token');
+      await setToken(token);
+      const { data: consent } = await consentApi.status();
+      if (!consent.accepted) setShowConsent(true);
       else navigate('/dashboard', { replace: true });
     } catch (err) {
       setError(err.response?.data?.message || 'Invalid or expired OTP.');

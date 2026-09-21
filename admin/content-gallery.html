@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Content & Gallery | NU Admin Portal</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --sidebar-bg: #0F172A;
+            --iris-blue: #3F51B5;
+            --bg-light: #F1F5F9; 
+            --text-main: #1E293B;
+            --text-muted: #64748B;
+            --white: #ffffff;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            display: flex;
+            min-height: 100vh;
+            background-color: var(--bg-light);
+        }
+
+        /* --- SIDEBAR --- */
+        .sidebar {
+            width: 260px;
+            background-color: var(--sidebar-bg);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            height: 100vh;
+        }
+
+        .sidebar-header {
+            padding: 30px 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .sidebar-header i {
+            background: var(--iris-blue);
+            padding: 8px;
+            border-radius: 8px;
+        }
+
+        .nav-links {
+            list-style: none;
+            padding: 0 16px;
+            flex: 1;
+        }
+
+        .nav-item {
+            padding: 12px 16px;
+            margin-bottom: 4px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: #94A3B8;
+            text-decoration: none;
+            font-size: 14px;
+            transition: 0.3s;
+        }
+
+        /* Active highlight para sa Content & Gallery */
+        .nav-item.active {
+            background-color: var(--iris-blue);
+            color: white;
+        }
+
+        .nav-item:hover:not(.active) {
+            background-color: rgba(255,255,255,0.05);
+            color: white;
+        }
+
+        .sign-out {
+            margin: 20px 16px;
+            padding: 12px 16px;
+            color: #F87171;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        /* --- MAIN CONTENT --- */
+        .main-content {
+            margin-left: 260px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 30px;
+        }
+
+        .user-pill {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: white;
+            padding: 8px 16px;
+            border-radius: 50px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        /* --- CONTENT CARD --- */
+        .page-content {
+            flex: 1;
+            padding: 40px;
+            background-color: var(--white);
+            margin: 0 30px 30px 30px;
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+
+        .page-header {
+            align-self: flex-start;
+            width: 100%;
+            margin-bottom: auto; /* Push construction state to center */
+        }
+
+        .page-header h1 { margin: 0; font-size: 28px; }
+        .page-header p { color: var(--text-muted); font-size: 14px; margin-top: 5px; }
+
+        /* Construction State Graphics */
+        .construction-state {
+            margin-bottom: auto; /* Center vertical align */
+            color: #CBD5E1;
+        }
+
+        .construction-state i {
+            font-size: 80px;
+            margin-bottom: 24px;
+            opacity: 0.5;
+        }
+
+        .construction-state h2 {
+            font-size: 20px;
+            color: #94A3B8;
+            margin: 0;
+        }
+
+        .construction-state p {
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-top: 8px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <i class="fas fa-graduation-cap"></i>
+            <span style="font-weight: 700;">NU Admin Portal</span>
+        </div>
+        <ul class="nav-links">
+            <a href="dashboard.php" class="nav-item"><i class="fas fa-th-large"></i> Dashboard</a>
+            <a href="manage-student.php" class="nav-item"><i class="fas fa-users"></i> Student Profiles</a>
+            <a href="faculty.php" class="nav-item"><i class="fas fa-user-tie"></i> Faculty</a>
+            <a href="content-gallery.php" class="nav-item active"><i class="fas fa-images"></i> Content & Gallery</a>
+            <a href="#" class="nav-item"><i class="fas fa-history"></i> Audit Logs</a>
+            <a href="#" class="nav-item"><i class="fas fa-cog"></i> System Settings</a>
+        </ul>
+        <a href="#" class="sign-out"><i class="fas fa-sign-out-alt"></i> Sign Out</a>
+    </nav>
+
+    <div class="main-content">
+        <header class="header-top">
+            <div style="font-size: 14px; color: var(--text-muted);">Wednesday, February 4, 2026</div>
+            <div class="user-pill">
+                <div style="text-align: right;">
+                    <span style="display:block; font-size:12px; font-weight:700;">Admin User</span>
+                    <small style="color:var(--text-muted); font-size:10px;">SUPER ADMINISTRATOR</small>
+                </div>
+                <img src="https://ui-avatars.com/api/?name=Admin+User&background=3F51B5&color=fff" width="35" style="border-radius: 50%;">
+            </div>
+        </header>
+
+        <main class="page-content">
+            <div class="page-header">
+                <h1>Content</h1>
+                <p>Manage your yearbook system data efficiently.</p>
+            </div>
+            
+            <div class="construction-state">
+                <i class="fas fa-images"></i>
+                <h2>Module Under Construction</h2>
+                <p>The content module is coming soon.</p>
+            </div>
+        </main>
+    </div>
+
+</body>
+</html>

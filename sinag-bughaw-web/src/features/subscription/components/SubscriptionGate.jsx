@@ -60,7 +60,7 @@ export default function SubscriptionGate({
         </p>
 
         <button
-          onClick={() => navigate('/payment')}
+          onClick={() => navigate('/premium')}
           onMouseEnter={() => setHov(true)}
           onMouseLeave={() => setHov(false)}
           style={{
@@ -74,7 +74,7 @@ export default function SubscriptionGate({
             transition: 'all 0.15s',
           }}
         >
-          🔓 Upgrade to Premium
+          Upgrade to Premium
         </button>
       </div>
     </div>

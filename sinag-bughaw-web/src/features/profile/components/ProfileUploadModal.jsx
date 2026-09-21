@@ -194,7 +194,7 @@ export default function ProfileUploadModal({ onClose, onSuccess }) {
                 ))}
               </div>
 
-              <Link to="/subscription" onClick={onClose}
+              <Link to="/premium" onClick={onClose}
                 className="inline-flex items-center gap-2 bg-gradient-to-r from-[#fdb813] to-amber-500 text-[#1d2b4b]
                            no-underline px-7 py-3 rounded-xl text-sm font-black shadow-lg shadow-amber-200/40">
                 <i className="fas fa-crown text-xs" /> Upgrade Now

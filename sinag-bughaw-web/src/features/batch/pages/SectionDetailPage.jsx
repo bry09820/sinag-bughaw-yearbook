@@ -182,7 +182,7 @@ export default function SectionDetailPage() {
               </p>
             </div>
           </div>
-          <Link to="/payment"
+          <Link to="/premium"
             className="no-underline font-bold text-xs px-5 py-3 rounded-xl whitespace-nowrap"
             style={{ background: '#fdb813', color: '#1d2b4b' }}>
             Upgrade Now <i className="fas fa-arrow-right ml-1" />
@@ -340,7 +340,7 @@ export default function SectionDetailPage() {
                 : 'No students have been assigned to this section yet.'}
             </p>
             {!isPremium && (
-              <Link to="/payment"
+              <Link to="/premium"
                 className="inline-block mt-5 font-bold text-sm no-underline px-7 py-3 rounded-xl"
                 style={{ background: '#1d2b4b', color: 'white' }}>
                 <i className="fas fa-crown mr-2" style={{ color: '#fdb813' }} />

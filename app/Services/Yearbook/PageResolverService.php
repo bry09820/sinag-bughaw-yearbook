@@ -118,7 +118,7 @@ class PageResolverService
 
         $sectionCount = (clone $sectionQuery)->count();
         $courseCount = (clone $sectionQuery)
-            ->get(['course', 'strand'])
+            ->get(['course'])
             ->map(fn ($section) => $this->courseNameForSection($section))
             ->unique()
             ->count();

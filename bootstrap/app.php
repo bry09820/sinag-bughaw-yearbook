@@ -54,6 +54,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'feature'             => \App\Http\Middleware\EnsureFeatureEnabled::class,
             'require.super_admin' => \App\Http\Middleware\RequireSuperAdmin::class,
             'active.account'      => \App\Http\Middleware\EnsureAccountIsActive::class,
+            'verified'            => \App\Http\Middleware\EnsureEmailIsVerified::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

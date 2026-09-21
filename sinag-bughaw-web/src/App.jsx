@@ -88,7 +88,7 @@ function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
 
   if (loading) return <FullPageSpinner />;
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user || !user.email_verified) return <Navigate to="/login" replace />;
   return <ConsentWrapper>{children}</ConsentWrapper>;
 }
 
@@ -97,7 +97,8 @@ function GuestRoute({ children }) {
   const { isOn, loading: configLoading } = useAppConfig();
   if (loading || configLoading) return null;
   if (isOn('maintenance_mode')) return <Navigate to="/maintenance" replace />;
-  if (user) return <Navigate to="/dashboard" replace />;
+  // Only skip login/register when the user is fully verified.
+  if (user?.email_verified) return <Navigate to="/dashboard" replace />;
   return children;
 }
 
@@ -113,7 +114,7 @@ function OwnProfileRoute({ children }) {
   const { id }            = useParams();
 
   if (loading) return <FullPageSpinner />;
-  if (!user)   return <Navigate to="/login" replace />;
+  if (!user || !user.email_verified) return <Navigate to="/login" replace />;
   if (id && parseInt(id) !== user.id) return <Navigate to={`/students/${id}`} replace />;
   return <ConsentWrapper>{children}</ConsentWrapper>;
 }
@@ -229,6 +230,8 @@ export default function App() {
               <Route path="/announcements" element={<ProtectedRoute><AnnouncementsPage /></ProtectedRoute>} />
 
               {/* Payment */}
+              <Route path="/payment" element={<Navigate to="/premium" replace />} />
+              <Route path="/subscription" element={<Navigate to="/premium" replace />} />
               <Route
                 path="/premium"
                 element={

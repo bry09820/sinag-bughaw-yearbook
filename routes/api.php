@@ -45,6 +45,7 @@ use App\Http\Controllers\API\Social\PresenceController;
 use App\Http\Controllers\API\AI\MemoryController;
 use App\Http\Controllers\API\Alumni\AlumniTrackerController;
 use App\Http\Controllers\API\AppConfigController;
+use App\Http\Controllers\BillingController;
 use Illuminate\Support\Facades\Route;
 
 // PUBLIC ROUTES
@@ -62,7 +63,8 @@ Route::prefix('auth')->group(function () {
     Route::post('/reset-password',   [AuthController::class, 'resetPassword']);
 });
 
-Route::post('/payments/webhook',    [PaymentController::class,     'webhook']);
+Route::post('/payments/webhook',    [PaymentController::class, 'webhook']);
+Route::post('/paymongo/webhook',    [PaymentController::class, 'webhook']);
 Route::get('/announcements',        [AnnouncementController::class, 'index']);
 Route::get('/analytics/top-viewed', [AnalyticsController::class,   'topViewed']);
 Route::post('/analytics/record-view/{userId}', [AnalyticsController::class, 'recordView']);
@@ -83,7 +85,7 @@ Route::get('/yearbook/export/mobile-pdf/{batchId}', [YearbookPdfController::clas
 // PROTECTED ROUTES (auth:sanctum + throttle 120 req/min)
 
 
-Route::middleware(['auth:sanctum', 'active.account', 'throttle:120,1'])->group(function () {
+Route::middleware(['auth:sanctum', 'active.account', 'verified', 'throttle:120,1'])->group(function () {
 
     // Auth 
     Route::prefix('auth')->group(function () {
@@ -251,15 +253,19 @@ Route::middleware(['auth:sanctum', 'active.account', 'throttle:120,1'])->group(f
         Route::delete('/photo/{id}', [MediaController::class, 'deletePhoto']);
     });
 
-    // Yearbook 
+    // Yearbook — list/search remain open; flipbook content requires Standard+
     Route::prefix('yearbook')->group(function () {
         Route::get('/flipbook', [YearbookController::class, 'flipbookData'])
-            ->middleware('feature:enable_flipbook_viewer');
-        Route::get('/export/{userId}',        [YearbookController::class,      'exportStudentPdf']);
+            ->middleware(['standard', 'feature:enable_flipbook_viewer']);
+        Route::get('/export/{userId}',        [YearbookController::class,      'exportStudentPdf'])
+            ->middleware('standard');
         Route::get('/search',                 [YearbookController::class,      'search']);
-        Route::get('/bookmarks/{batchId}',    [YearbookController::class,      'getBookmarks']);
-        Route::post('/bookmark',              [YearbookController::class,      'addBookmark']);
-        Route::delete('/bookmark/{bookmark}', [YearbookController::class,      'removeBookmark']);
+        Route::get('/bookmarks/{batchId}',    [YearbookController::class,      'getBookmarks'])
+            ->middleware('standard');
+        Route::post('/bookmark',              [YearbookController::class,      'addBookmark'])
+            ->middleware('standard');
+        Route::delete('/bookmark/{bookmark}', [YearbookController::class,      'removeBookmark'])
+            ->middleware('standard');
         Route::get('/alumni-from-page',       [AlumniTrackerController::class, 'fromYearbookPage'])
             ->name('yearbook.alumni-from-page');
     });
@@ -269,17 +275,17 @@ Route::middleware(['auth:sanctum', 'active.account', 'throttle:120,1'])->group(f
         Route::get('{batch}', [YearbookController::class, 'show'])
             ->name('yearbooks.show');
         Route::get('{batch}/pages', [YearbookController::class, 'pages'])
-            ->middleware('feature:enable_flipbook_viewer')
+            ->middleware(['standard', 'feature:enable_flipbook_viewer'])
             ->name('yearbooks.pages');
         Route::get('{batch}/galleries',           [GalleryController::class,  'index'])
             ->name('yearbooks.galleries.index');
         Route::get('{batch}/galleries/{gallery}', [GalleryController::class,  'show'])
             ->name('yearbooks.galleries.show');
         Route::post('{batch}/photos',             [YearbookController::class, 'uploadPhoto'])
-            ->middleware('throttle:20,1')
+            ->middleware(['standard', 'throttle:20,1'])
             ->name('yearbooks.photos.upload');
         Route::post('{batch}/generate',           [YearbookController::class, 'generate'])
-            ->middleware(['throttle:20,1', 'feature:enable_flipbook_viewer'])
+            ->middleware(['standard', 'throttle:20,1', 'feature:enable_flipbook_viewer'])
             ->name('yearbooks.generate');
     });
 
@@ -294,6 +300,12 @@ Route::middleware(['auth:sanctum', 'active.account', 'throttle:120,1'])->group(f
             ->middleware('feature:enable_premium_subscription');
         Route::get('/history',        [PaymentController::class, 'history']);
         Route::get('/status',         [PaymentController::class, 'subscriptionStatus']);
+    });
+
+    // Billing / checkout aliases (JSON by default for API clients)
+    Route::prefix('billing')->middleware('feature:enable_premium_subscription')->group(function () {
+        Route::match(['get', 'post'], '/', [BillingController::class, 'checkout']);
+        Route::match(['get', 'post'], '/checkout', [BillingController::class, 'checkout']);
     });
 
     // Notifications 

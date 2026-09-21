@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NU Lipa Yearbook - Faculty</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --nu-blue: #3b4e9f;
+            --nu-dark: #12192c; /* Matches the specific dark navy in your prototype */
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: #f8fafc;
+        }
+
+        /* --- Navbar --- */
+        nav {
+            background: white;
+            padding: 15px 8%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .nav-logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logo-square {
+            width: 32px;
+            height: 32px;
+            background: var(--nu-blue);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 30px;
+            list-style: none;
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .nav-links a.active {
+            color: var(--nu-blue);
+            background: #f1f5f9;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+        }
+
+        /* --- Main Content --- */
+        .container {
+            max-width: 1200px;
+            margin: 60px auto;
+            padding: 0 8%;
+        }
+
+        .page-title {
+            font-size: 2.2rem;
+            color: var(--nu-dark);
+            margin-bottom: 8px;
+        }
+
+        .page-subtitle {
+            color: var(--text-muted);
+            margin-bottom: 40px;
+            font-size: 1rem;
+        }
+
+        /* --- Faculty Cards (Horizontal Style from Image 3) --- */
+        .faculty-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 24px;
+        }
+
+        .faculty-card {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            padding: 25px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+
+        .faculty-img {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            object-fit: cover;
+            background: #e2e8f0;
+        }
+
+        .faculty-info h3 {
+            font-size: 1.1rem;
+            color: var(--nu-dark);
+            margin-bottom: 4px;
+        }
+
+        .faculty-info p {
+            font-size: 0.85rem;
+            color: var(--nu-blue);
+            margin-bottom: 12px;
+        }
+
+        .view-profile {
+            font-size: 0.75rem;
+            color: var(--nu-dark);
+            text-decoration: none;
+            font-weight: 700;
+            border-bottom: 1px solid transparent;
+            transition: 0.2s;
+        }
+
+        .view-profile:hover {
+            border-bottom: 1px solid var(--nu-dark);
+        }
+
+        /* --- UPDATED FOOTER (Matches Prototype Exactly) --- */
+        footer {
+            background: var(--nu-dark);
+            color: white;
+            padding: 80px 8% 40px;
+            margin-top: 100px;
+        }
+
+        .footer-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1.5fr;
+            gap: 40px;
+        }
+
+        .footer-col h4 {
+            font-size: 1.1rem;
+            margin-bottom: 25px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .footer-col p, .footer-col li {
+            font-size: 0.85rem;
+            color: #94a3b8;
+            line-height: 1.6;
+            margin-bottom: 12px;
+            list-style: none;
+        }
+
+        .footer-socials {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .footer-socials i {
+            font-size: 1.1rem;
+            color: #94a3b8;
+            cursor: pointer;
+        }
+
+        .contact-item {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+
+        .contact-item i {
+            color: var(--nu-blue);
+            margin-top: 4px;
+        }
+
+        .footer-bottom {
+            margin-top: 60px;
+            padding-top: 30px;
+            border-top: 1px solid rgba(255,255,255,0.05);
+            text-align: center;
+            font-size: 0.75rem;
+            color: #475569;
+        }
+    </style>
+</head>
+<body>
+
+<nav>
+    <div class="nav-logo">
+        <div class="logo-square"><i class="fas fa-graduation-cap"></i></div>
+        <div>
+            <span style="font-weight: bold; color: var(--nu-blue); font-size: 0.9rem; display: block;">NU Lipa</span>
+            <span style="font-size: 0.65rem; color: var(--text-muted); letter-spacing: 1px;">YEARBOOK</span>
+        </div>
+    </div>
+    <ul class="nav-links">
+        <li><a href="#">Home</a></li>
+        <li><a href="#">Directory</a></li>
+        <li><a href="#" class="active">Faculty</a></li>
+        <li><a href="#">Gallery</a></li>
+        <li><a href="#">sections</a></li>
+    </ul>
+    <div style="display:flex; align-items:center; gap:10px; font-size: 0.75rem; text-align: right;">
+        <div>
+            <strong style="display:block;">Alex De La Cruz</strong>
+            <span style="color: var(--text-muted);">2026 • BS Computer Science</span>
+        </div>
+        <div style="width:35px; height:35px; border-radius: 50%; background: #333; overflow:hidden;">
+             </div>
+    </div>
+</nav>
+
+<main class="container">
+    <h1 class="page-title">Faculty & Administration</h1>
+    <p class="page-subtitle">Meet the dedicated mentors shaping our future.</p>
+
+    <div class="faculty-grid">
+        <div class="faculty-card">
+            <div class="faculty-img"></div>
+            <div class="faculty-info">
+                <h3>Dr. Emily Chen</h3>
+                <p>Dean, College of Computing</p>
+                <a href="#" class="view-profile">View Profile</a>
+            </div>
+        </div>
+
+        <div class="faculty-card">
+            <div class="faculty-img"></div>
+            <div class="faculty-info">
+                <h3>Prof. Mark Villa</h3>
+                <p>Head, Engineering Dept.</p>
+                <a href="#" class="view-profile">View Profile</a>
+            </div>
+        </div>
+    </div>
+</main>
+
+<footer>
+    <div class="footer-grid">
+        <div class="footer-col">
+            <h4><i class="fas fa-graduation-cap"></i> NU Lipa</h4>
+            <p>Celebrating academic excellence and cherished memories. The official digital yearbook platform of National University Lipa.</p>
+            <div class="footer-socials">
+                <i class="fab fa-facebook-f"></i>
+                <i class="fab fa-twitter"></i>
+                <i class="fab fa-instagram"></i>
+                <i class="fab fa-linkedin-in"></i>
+            </div>
+        </div>
+
+        <div class="footer-col">
+            <h4>Quick Links</h4>
+            <li>Student Directory</li>
+            <li>Faculty & Staff</li>
+            <li>Photo Gallery</li>
+            <li>Events Calendar</li>
+        </div>
+
+        <div class="footer-col">
+            <h4>Support</h4>
+            <li>Help Center</li>
+            <li>Privacy Policy</li>
+            <li>Terms of Service</li>
+            <li>Contact Administrator</li>
+        </div>
+
+        <div class="footer-col">
+            <h4>Contact Us</h4>
+            <div class="contact-item">
+                <i class="fas fa-map-marker-alt"></i>
+                <p>Km. 75 JP Laurel Highway, Brgy. Marawoy, Lipa City, Batangas</p>
+            </div>
+            <div class="contact-item">
+                <i class="fas fa-phone"></i>
+                <p>+63 (043) 123 4567</p>
+            </div>
+            <div class="contact-item">
+                <i class="fas fa-envelope"></i>
+                <p>admissions@nu-lipa.edu.ph</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer-bottom">
+        © 2026 National University Lipa. All rights reserved.
+    </div>
+</footer>
+
+</body>
+</html>

@@ -27,19 +27,21 @@ class SendOtpEmail implements ShouldQueue
     {
         Log::info("SendOtpEmail triggered for: {$this->email}");
 
+        // Always print the code so local/mobile testing works even if SMTP is down.
+        Log::info("OTP verification code for {$this->email}: {$this->otp}");
+
         $user = User::where('email', $this->email)->first();
         $name = $user?->name ?? $this->email;
 
         $sent = $mailer->sendOtp($this->email, $name, $this->otp);
 
         if (! $sent) {
-            Log::error("OTP email failed for {$this->email} — attempt {$this->attempts()}");
-            if ($this->attempts() >= $this->tries) {
-                $this->fail(new \RuntimeException("Brevo mail failed after {$this->tries} attempts."));
-            }
-        } else {
-            Log::info("OTP email sent successfully to {$this->email}");
+            // OTP is already stored in otp_verifications; keep registration usable.
+            Log::error("OTP email delivery failed for {$this->email} — code is still valid in DB/logs (attempt {$this->attempts()})");
+            return;
         }
+
+        Log::info("OTP email sent successfully to {$this->email}");
     }
 
     public function failed(\Throwable $e): void

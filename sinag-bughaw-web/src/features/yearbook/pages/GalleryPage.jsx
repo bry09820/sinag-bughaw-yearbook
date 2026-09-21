@@ -1778,7 +1778,7 @@ export default function GalleryPage() {
             usedBytes={storage.used_bytes}
             limitBytes={storage.limit_bytes}
             tier={tier}
-            onUpgrade={() => window.location.href = '/subscription'}
+            onUpgrade={() => window.location.href = '/premium'}
           />
         </div>
       )}

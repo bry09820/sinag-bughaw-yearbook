@@ -37,7 +37,7 @@ api.interceptors.response.use(
       window.location.href = '/login';
     }
     if (err.response?.status === 402) {
-      window.location.href = '/payment';
+      window.location.href = '/premium';
     }
     return Promise.reject(err);
   }

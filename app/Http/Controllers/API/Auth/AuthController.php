@@ -62,46 +62,88 @@ class AuthController extends Controller
                 })
                 ->value('id');
 
-        $user = User::create([
-            'first_name'        => $studentRecord?->first_name ?? $request->first_name,
-            'last_name'         => $studentRecord?->last_name ?? $request->last_name,
-            'name'              => $studentRecord
-                ? trim($studentRecord->first_name . ' ' . $studentRecord->last_name)
-                : trim($request->first_name . ' ' . $request->last_name),
-            'email'             => $request->email,
-            'password'          => Hash::make($request->password),
-            'student_record_id' => $studentRecord?->id,
-            'student_id'        => $studentRecord?->student_no ?? $request->student_id,
-            'course'            => $course,
-            'graduation_year'   => $graduationYear,
-            'batch'             => $batch,
-            'section_id'        => $studentRecord?->section_id,
-            'batch_id'          => $batchId,
-            'profile_picture'   => $studentRecord?->photo,
-            'consent_accepted'  => true,
-        ]);
+        try {
+            User::disableSearchSyncing();
+
+            $user = User::create([
+                'first_name'        => $studentRecord?->first_name ?? $request->first_name,
+                'last_name'         => $studentRecord?->last_name ?? $request->last_name,
+                'name'              => $studentRecord
+                    ? trim($studentRecord->first_name . ' ' . $studentRecord->last_name)
+                    : trim($request->first_name . ' ' . $request->last_name),
+                'email'             => $request->email,
+                'password'          => $request->password,
+                'role'              => User::ROLE_STUDENT,
+                'student_record_id' => $studentRecord?->id,
+                'student_id'        => $studentRecord?->student_no ?? $request->student_id,
+                'course'            => $course,
+                'graduation_year'   => $graduationYear,
+                'batch'             => $batch,
+                'section_id'        => $studentRecord?->section_id,
+                'batch_id'          => $batchId,
+                'profile_picture'   => $studentRecord?->photo,
+                'consent_accepted'  => true,
+                'email_verified'    => false,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Registration failed', [
+                'email'   => $request->email,
+                'message' => $e->getMessage(),
+            ]);
+
+            throw $e;
+        } finally {
+            User::enableSearchSyncing();
+        }
 
         if ($studentRecord && filled($studentRecord->photo)) {
             ProcessFaceIndexing::dispatch($user->fresh()->load('studentRecord'));
         }
 
-        Consent::create([
-            'user_id'     => $user->id,
-            'type'        => 'privacy_policy',
-            'version'     => '1.0',
-            'accepted'    => true,
-            'ip_address'  => $request->ip(),
-            'user_agent'  => $request->userAgent(),
-            'accepted_at' => now(),
-        ]);
+        try {
+            Consent::create([
+                'user_id'     => $user->id,
+                'type'        => 'privacy_policy',
+                'version'     => '1.0',
+                'accepted'    => true,
+                'ip_address'  => $request->ip(),
+                'user_agent'  => $request->userAgent(),
+                'accepted_at' => now(),
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('Consent log failed during registration', [
+                'user_id' => $user->id,
+                'message' => $e->getMessage(),
+            ]);
+        }
 
-        $token = $user->createToken('app-token')->plainTextToken;
+        // Do not issue an access token until the email OTP is verified.
+        try {
+            $this->sendVerificationOtp($user->email);
+        } catch (\Throwable $e) {
+            Log::error('Registration OTP send failed', [
+                'email'   => $user->email,
+                'message' => $e->getMessage(),
+            ]);
+
+            // Account exists; OTP row may already be stored — client can resend.
+            return response()->json([
+                'user'              => $this->authUserPayload($user->load('studentRecord', 'section')),
+                'requires_otp'      => true,
+                'email'             => $user->email,
+                'email_send_failed' => true,
+                'message'           => 'Account created, but we could not send the verification email. Please use Resend.',
+                'is_graduate'       => ! is_null($studentRecord),
+            ], 201);
+        }
 
         $user->load('studentRecord', 'section');
 
         return response()->json([
             'user'         => $this->authUserPayload($user),
-            'access_token' => $token,
+            'requires_otp' => true,
+            'email'        => $user->email,
+            'message'      => 'Account created. Enter the verification code sent to your email.',
             'is_graduate'  => ! is_null($studentRecord),
         ], 201);
     }
@@ -123,7 +165,7 @@ class AuthController extends Controller
         $password = (string) $request->input('password');
 
         $key      = 'student_login:' . sha1($email . '|' . $request->ip());
-        $maxTries = (int) PlatformSettings::get('max_login_attempts');
+        $maxTries = max(1, (int) (PlatformSettings::get('max_login_attempts') ?: 5));
 
         if (RateLimiter::tooManyAttempts($key, $maxTries)) {
             $seconds = RateLimiter::availableIn($key);
@@ -137,7 +179,8 @@ class AuthController extends Controller
         $user = User::whereRaw('LOWER(TRIM(email)) = ?', [$email])->first();
 
         if (! $user || ! Hash::check($password, $user->getAuthPassword())) {
-            RateLimiter::hit($key, 60 * (int) PlatformSettings::get('session_timeout_minutes'));
+            $decayMinutes = max(1, (int) (PlatformSettings::get('session_timeout_minutes') ?: 60));
+            RateLimiter::hit($key, 60 * $decayMinutes);
 
             throw ValidationException::withMessages([
                 'email' => ['The provided credentials are incorrect.'],
@@ -146,14 +189,31 @@ class AuthController extends Controller
 
         RateLimiter::clear($key);
 
-        $token = $user->createToken('app-token')->plainTextToken;
-        $this->markPresence($user->id, true);
+        try {
+            // Credentials OK — require email OTP before issuing a session token.
+            $this->sendVerificationOtp($user->email);
 
-        return response()->json([
-            'user'             => $user->load('studentRecord', 'section'),
-            'token'            => $token,
-            'requires_consent' => ! $user->consent_accepted,
-        ]);
+            return response()->json([
+                'requires_otp'     => true,
+                'email'            => $user->email,
+                'message'          => 'Verification code sent to your email.',
+                'requires_consent' => ! $user->consent_accepted,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Login OTP send failed', [
+                'email'   => $user->email,
+                'message' => $e->getMessage(),
+            ]);
+
+            // OTP may still be stored — advance to verification UI and allow Resend.
+            return response()->json([
+                'requires_otp'      => true,
+                'email'             => $user->email,
+                'email_send_failed' => true,
+                'message'           => 'We could not send the verification email. Please use Resend.',
+                'requires_consent'  => ! $user->consent_accepted,
+            ]);
+        }
     }
 
     // Student lookup
@@ -212,18 +272,26 @@ class AuthController extends Controller
     {
         $request->validate(['email' => 'required|email']);
 
-        $otp = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        $email = strtolower(trim((string) $request->email));
+        $user = User::whereRaw('LOWER(TRIM(email)) = ?', [$email])->first();
 
-        OtpVerification::updateOrCreate(
-            ['email' => $request->email, 'type' => 'verification'],
-            [
-                'otp'        => $otp,
-                'expires_at' => now()->addMinutes(10),
-                'used'       => false,
-            ]
-        );
+        if (! $user) {
+            // Avoid account enumeration.
+            return response()->json(['message' => 'OTP sent to your email.']);
+        }
 
-        SendOtpEmail::dispatch($request->email, $otp);
+        try {
+            $this->sendVerificationOtp($user->email);
+        } catch (\Throwable $e) {
+            Log::error('sendOtp failed', [
+                'email'   => $user->email,
+                'message' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to send verification email. Please try again.',
+            ], 500);
+        }
 
         return response()->json(['message' => 'OTP sent to your email.']);
     }
@@ -235,7 +303,9 @@ class AuthController extends Controller
             'otp'   => 'required|string|size:6',
         ]);
 
-        $record = OtpVerification::where('email', $request->email)
+        $email = strtolower(trim((string) $request->email));
+
+        $record = OtpVerification::whereRaw('LOWER(TRIM(email)) = ?', [$email])
             ->where('type', 'verification')
             ->where('otp', $request->otp)
             ->where('used', false)
@@ -248,19 +318,25 @@ class AuthController extends Controller
 
         $record->update(['used' => true]);
 
-        $user = User::where('email', $request->email)->first();
+        $user = User::whereRaw('LOWER(TRIM(email)) = ?', [$email])->first();
 
         if (! $user) {
             return response()->json(['message' => 'User not found.'], 404);
         }
 
-        $user->update(['email_verified' => true]);
+        $user->update([
+            'email_verified'    => true,
+            'email_verified_at' => $user->email_verified_at ?? now(),
+        ]);
 
+        $user->tokens()->delete();
         $token = $user->createToken('app-token')->plainTextToken;
+        $this->markPresence($user->id, true);
 
         return response()->json([
             'message'      => 'Email verified successfully.',
             'access_token' => $token,
+            'token'        => $token,
             'user'         => $this->authUserPayload($user->fresh()->load('studentRecord', 'section')),
         ]);
     }
@@ -377,10 +453,11 @@ class AuthController extends Controller
 
         return response()->json([
             ...$user->toArray(),
-            'is_subscribed' => (bool) $activeSub,
-            'is_premium'    => $activeSub?->isPremium() ?? false,
-            'tier'          => $activeSub?->tier ?? 'free',
-            'plan'          => $activeSub?->plan ?? 'free',
+            'is_subscribed'         => (bool) $activeSub,
+            'is_premium'            => $activeSub?->isPremium() ?? false,
+            'subscription_status'   => $activeSub?->tier ?? 'free',
+            'tier'                  => $activeSub?->tier ?? 'free',
+            'plan'                  => $activeSub?->plan ?? 'free',
         ]);
     }
 
@@ -454,14 +531,39 @@ class AuthController extends Controller
         ];
     }
 
-    private function markPresence(int $userId, bool $isOnline): void
+    private function sendVerificationOtp(string $email): void
     {
-        UserPresence::updateOrCreate(
-            ['user_id' => $userId],
+        $email = strtolower(trim($email));
+        $otp = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+
+        OtpVerification::updateOrCreate(
+            ['email' => $email, 'type' => 'verification'],
             [
-                'is_online'    => $isOnline,
-                'last_seen_at' => now(),
+                'otp'        => $otp,
+                'expires_at' => now()->addMinutes(10),
+                'used'       => false,
             ]
         );
+
+        // Send immediately so OTP emails work without a running queue worker.
+        SendOtpEmail::dispatchSync($email, $otp);
+    }
+
+    private function markPresence(int $userId, bool $isOnline): void
+    {
+        try {
+            UserPresence::updateOrCreate(
+                ['user_id' => $userId],
+                [
+                    'is_online'    => $isOnline,
+                    'last_seen_at' => now(),
+                ]
+            );
+        } catch (\Throwable $e) {
+            Log::warning('Presence update failed', [
+                'user_id' => $userId,
+                'message' => $e->getMessage(),
+            ]);
+        }
     }
 }

@@ -26,7 +26,9 @@ class CheckPremium
         if (! $sub || ! $sub->isPremium()) {
             return response()->json([
                 'message'     => 'A premium subscription is required to access this feature.',
-                'upgrade_url' => '/payment',
+                'upgrade_url' => '/premium',
+                'subscription_status' => 'free',
+                'required_tier' => 'premium',
             ], 402);
         }
 

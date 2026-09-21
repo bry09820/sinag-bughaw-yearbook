@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\API\Auth\SocialAuthController;
+use App\Http\Controllers\BillingController;
 use Illuminate\Support\Facades\Route;
 
 // WEB Google OAuth
@@ -23,7 +24,19 @@ Route::get('/app/auth/google/redirect', [SocialAuthController::class, 'mobileRed
 Route::get('/app/auth/google/callback', [SocialAuthController::class, 'mobileHandleGoogleCallback'])
     ->name('auth.google.mobile.callback');
 
-// SPA catch-all (must be LAST)
-Route::get('/{any}', function () {
+// PayMongo billing / checkout (must be before SPA catch-all so /billing is not 404)
+Route::middleware(['auth:sanctum', 'verified', 'active.account'])->group(function () {
+    Route::match(['get', 'post'], '/billing', [BillingController::class, 'checkout'])
+        ->name('billing');
+    Route::match(['get', 'post'], '/billing/checkout', [BillingController::class, 'checkout'])
+        ->name('billing.checkout');
+    Route::match(['get', 'post'], '/checkout', [BillingController::class, 'checkout'])
+        ->name('checkout');
+});
+
+// SPA catch-all including "/" (must be LAST).
+// Optional {any?} is required so the root URL matches; the negative
+// lookahead keeps Google OAuth + billing routes above from being swallowed.
+Route::get('/{any?}', function () {
     return view('app');
-})->where('any', '^(?!(auth|app/auth)/).*$');
+})->where('any', '^(?!(auth|app/auth|billing|checkout)(/|$)).*');

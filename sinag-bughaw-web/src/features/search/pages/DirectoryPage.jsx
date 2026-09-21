@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import { studentsApi } from '@/api/student.api';
@@ -10,6 +10,8 @@ import FilterTabStrip from '@/components/ui/FilterTabStrip';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
 import { imageUrl, avatarUrl } from '@/utils/imageUrl';
 import { COURSE_FILTERS, getCourseShort } from '@/utils/courseShort';
+import { useSubscriptionGuard } from '@/features/subscription/hooks/useSubscriptionGuard';
+import { useAppConfig } from '@/features/platform/AppConfigProvider';
 
 // Constants
 const faceUserId = (match) => {
@@ -118,7 +120,7 @@ function FaceMatchBanner({ matches, onClear }) {
 }
 
 // StudentCard
-function StudentCard({ student, index, isMatched, matchData }) {
+function StudentCard({ student, index, isMatched, matchData, locked = false, onLockedPress }) {
   const [imgError, setImgError] = useState(false);
   const batchYear   = student.batch_year || new Date().getFullYear();
   const hasPhoto    = isUsableStudentPhoto(student.profile_picture ?? student.photo_url ?? student.photo) && !imgError;
@@ -127,18 +129,17 @@ function StudentCard({ student, index, isMatched, matchData }) {
   const hasCourse = rawCourse && rawCourse.toLowerCase() !== 'no program listed';
   const courseShort = hasCourse ? (student.course_short || getCourseShort(student.course)) : '';
 
-  return (
-    <Link
-      to={`/students/${student.user_id ?? student.id}`}
-      className="group bg-white rounded-3xl overflow-hidden shadow-sm no-underline block
-                 hover:-translate-y-2 hover:shadow-xl transition-all duration-300"
-      style={{
-        animation:    `fadeInUp 0.42s ease ${index * 0.04}s forwards`,
-        opacity:      0,
-        border:       isMatched ? '2px solid #fdb813' : '2px solid transparent',
-        boxShadow:    isMatched ? '0 8px 30px rgba(253,184,19,0.2)' : undefined,
-      }}
-    >
+  const cardClassName = `group bg-white rounded-3xl overflow-hidden shadow-sm no-underline block
+                 hover:-translate-y-2 hover:shadow-xl transition-all duration-300`;
+  const cardStyle = {
+    animation:    `fadeInUp 0.42s ease ${index * 0.04}s forwards`,
+    opacity:      0,
+    border:       isMatched ? '2px solid #fdb813' : '2px solid transparent',
+    boxShadow:    isMatched ? '0 8px 30px rgba(253,184,19,0.2)' : undefined,
+  };
+
+  const body = (
+    <>
       {/* Photo area */}
       <div className="h-60 relative overflow-hidden bg-[#1d2b4b]">
         {hasPhoto ? (
@@ -173,7 +174,7 @@ function StudentCard({ student, index, isMatched, matchData }) {
         <div className="absolute inset-0 bg-[#1d2b4b]/70 backdrop-blur-sm flex items-center justify-center
                         opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20">
           <span className="bg-white text-[#1d2b4b] font-black text-sm px-5 py-2.5 rounded-xl flex items-center gap-2">
-            <i className="fas fa-eye" /> View Profile
+            <i className={`fas ${locked ? 'fa-lock' : 'fa-eye'}`} /> {locked ? 'Upgrade to View' : 'View Profile'}
           </span>
         </div>
       </div>
@@ -187,6 +188,24 @@ function StudentCard({ student, index, isMatched, matchData }) {
           </span>
         )}
       </div>
+    </>
+  );
+
+  if (locked) {
+    return (
+      <button type="button" onClick={onLockedPress} className={`${cardClassName} cursor-pointer w-full text-left border-0 p-0`} style={cardStyle}>
+        {body}
+      </button>
+    );
+  }
+
+  return (
+    <Link
+      to={`/students/${student.user_id ?? student.id}`}
+      className={cardClassName}
+      style={cardStyle}
+    >
+      {body}
     </Link>
   );
 }
@@ -194,7 +213,12 @@ function StudentCard({ student, index, isMatched, matchData }) {
 // Main Page
 export default function DirectoryPage() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { user } = useAuth();
+  const { isOn } = useAppConfig();
+  const { isSubscribed } = useSubscriptionGuard();
+  const premiumEnabled = isOn('enable_premium_subscription');
+  const profilesLocked = premiumEnabled && !isSubscribed;
 
   const [students, setStudents] = useState([]);
   const [loading,  setLoading]  = useState(true);
@@ -220,6 +244,8 @@ export default function DirectoryPage() {
   const visibleStudents = Number.isFinite(currentUserId) && currentUserId > 0
     ? students.filter(student => studentUserId(student) !== currentUserId)
     : students;
+
+  const promptUpgrade = () => navigate('/premium');
 
   // Fetch students
   const fetchStudents = useCallback(async (q = query, c = course, p = 1) => {
@@ -418,6 +444,24 @@ export default function DirectoryPage() {
       {/* Main content */}
       <main className="flex-1 px-4 sm:px-[8%] py-8">
 
+        {profilesLocked && (
+          <button
+            type="button"
+            onClick={promptUpgrade}
+            className="mb-6 w-full flex items-center gap-4 rounded-2xl bg-[#263187] px-5 py-4 text-left border-0 cursor-pointer"
+          >
+            <div className="flex-1 min-w-0">
+              <p className="m-0 text-white text-sm font-black">Directory profiles locked</p>
+              <p className="m-0 mt-1 text-[#d8dff4] text-xs">
+                Free accounts can browse the directory. Upgrade to open full student profiles.
+              </p>
+            </div>
+            <span className="shrink-0 rounded-xl bg-[#fdb813] text-[#102044] text-xs font-black px-4 py-2.5">
+              Upgrade
+            </span>
+          </button>
+        )}
+
         {/* Loading */}
         {loading ? (
           <LoadingSkeleton variant="card" count={8} />
@@ -450,6 +494,8 @@ export default function DirectoryPage() {
                   index={i}
                   isMatched={matchedIds.has(studentUserId(student))}
                   matchData={faceMatches.find(m => m.user_id === studentUserId(student))}
+                  locked={profilesLocked}
+                  onLockedPress={promptUpgrade}
                 />
               ))}
             </div>

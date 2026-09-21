@@ -187,6 +187,7 @@ class SocialAuthController extends Controller
                     'google_id'         => $googleUser->getId(),
                     'google_token'      => $googleUser->token,
                     'avatar'            => $googleUser->getAvatar(),
+                    'email_verified'    => true,
                     'email_verified_at' => $user->email_verified_at ?? now(),
                     'consent_accepted'  => true,
                 ]);
@@ -200,6 +201,7 @@ class SocialAuthController extends Controller
                     'email'             => $email,
                     'google_token'      => $googleUser->token,
                     'avatar'            => $googleUser->getAvatar(),
+                    'email_verified'    => true,
                     'email_verified_at' => now(),
                     'consent_accepted'  => true,
                     'password'          => Hash::make(Str::random(32)),

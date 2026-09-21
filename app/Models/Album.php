@@ -21,17 +21,22 @@ class Album extends Model
         'type',
         'category',
         'event_date',
-        'cover_photo_url',
+        'cover_image',
         'media_url',
-        'is_published',
-        'sort_order',
+        'status',
+        'published_at',
         'user_id',
+        'batch_id',
+        'cloudinary_public_id',
+        'approved_at',
+        'rejected_at',
     ];
 
     protected $casts = [
         'event_date'   => 'date',
-        'is_published' => 'boolean',
-        'sort_order'   => 'integer',
+        'published_at' => 'datetime',
+        'approved_at'  => 'datetime',
+        'rejected_at'  => 'datetime',
     ];
 
     // Relationships
@@ -57,7 +62,10 @@ class Album extends Model
 
     public function scopePublished(Builder $query): Builder
     {
-        return $query->where('is_published', true);
+        return $query->where(function ($q) {
+            $q->where('status', 'published')
+                ->orWhereNotNull('published_at');
+        });
     }
 
     public function scopeGeneral(Builder $query): Builder

@@ -45,6 +45,7 @@ import {
   searchYearbook,
   unwrap,
 } from '../../lib/api';
+import UpgradePrompt, { hasPaidAccess } from '../../components/UpgradePrompt';
 
 
 const NAVY   = '#0D1B3E';
@@ -100,11 +101,7 @@ const flatten = (p: any) => {
   return Object.values(d).flatMap((g: any) => Array.isArray(g) ? g : []);
 };
 
-const isPaid = (u: any) => Boolean(
-  u?.role === 'admin' || u?.is_premium || u?.is_subscribed ||
-  u?.subscription?.active || u?.subscription_status === 'active' ||
-  u?.tier === 'standard' || u?.tier === 'premium',
-);
+const isPaid = (u: any) => hasPaidAccess(u);
 
 const ptype  = (p: any) => String(p?.type || p?.page_type || '').toLowerCase();
 const ptitle = (p: any, fb = 'Yearbook Page') => p?.title || p?.label || p?.name || fb;
@@ -603,6 +600,7 @@ export default function YearbookScreen() {
   const [error,      setError]      = useState('');
   const [appCfg,     setAppCfg]     = useState<any>(null);
   const [curUser,    setCurUser]    = useState<any>(null);
+  const [upgradeVisible, setUpgradeVisible] = useState(false);
 
   // Single atomic flip state 
   const [flip, setFlip] = useState<FlipState>(makeFlipState(0, null));
@@ -619,7 +617,9 @@ export default function YearbookScreen() {
   const features   = appCfg?.features || {};
   const ybEnabled  = features.enable_flipbook_viewer !== false;
   const pdfEnabled = features.enable_yearbook_pdf_download !== false;
-  const canPdf     = pdfEnabled && isPaid(curUser);
+  const premiumEnabled = features.enable_premium_subscription !== false;
+  const canAccessYb = !premiumEnabled || isPaid(curUser);
+  const canPdf     = pdfEnabled && canAccessYb;
   const ybName     = appCfg?.yearbook_name || 'Sinag-Bughaw Digital Yearbook';
 
   const visible = useMemo(() => results.length ? results : pages, [pages, results]);
@@ -728,6 +728,12 @@ export default function YearbookScreen() {
 
   const openBatch = useCallback(async (batch: any, openReaderAfter = false) => {
     if (!ybEnabled) return;
+
+    if (!canAccessYb) {
+      setUpgradeVisible(true);
+      return;
+    }
+
     setSelBatch(batch);
     setDlLoading(true);
     setYbMeta(null); setPages([]); setGalleries([]); setBookmarks([]); setReaderOpen(false);
@@ -754,7 +760,7 @@ export default function YearbookScreen() {
       setReaderOpen(true);
     }
     setDlLoading(false);
-  }, [targetIdx, ybEnabled]);
+  }, [canAccessYb, targetIdx, ybEnabled]);
 
   const loadBatches = useCallback(async () => {
     if (!ybEnabled) { setBatches([]); setLoading(false); setRefreshing(false); return; }
@@ -804,13 +810,17 @@ export default function YearbookScreen() {
 
   const openPdf = async () => {
     if (!pdfEnabled) { Alert.alert('PDF disabled', 'PDF downloads are currently disabled.'); return; }
-    if (!canPdf)     { Alert.alert('Locked', 'PDF download requires Standard or Premium access.'); return; }
+    if (!canPdf)     { setUpgradeVisible(true); return; }
     const id = bid(selBatch); if (!id) return;
     try { await Linking.openURL(await getMobileYearbookPdfUrl(id)); }
     catch (e: any) { Alert.alert('PDF unavailable', getErrorMessage(e, 'Unable to open PDF.')); }
   };
 
   const openReader = (index: number) => {
+    if (!canAccessYb) {
+      setUpgradeVisible(true);
+      return;
+    }
     manClosed.current = false;
     autoDone.current  = true;
     clearAutoOpen();
@@ -960,13 +970,24 @@ export default function YearbookScreen() {
       <FlatList
         data={batches}
         keyExtractor={(item, i) => String(bid(item)||i)}
+        ListHeaderComponent={
+          premiumEnabled && !canAccessYb ? (
+            <TouchableOpacity style={s.upgradeBanner} activeOpacity={0.9} onPress={() => setUpgradeVisible(true)}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.upgradeTitle}>Yearbook locked</Text>
+                <Text style={s.upgradeText}>Upgrade to Standard or Premium to open flipbooks and download PDFs.</Text>
+              </View>
+              <View style={s.upgradeButton}><Text style={s.upgradeButtonText}>Upgrade</Text></View>
+            </TouchableOpacity>
+          ) : null
+        }
         renderItem={({ item }) => {
           const cover = imageUrl(item?.coverUrl || item?.cover_url || item?.cover);
           return (
             <TouchableOpacity style={s.bCard} onPress={() => openBatch(item, true)} activeOpacity={0.88}>
               {cover ? <Image source={cover} style={s.bCover} /> : <View style={s.bCoverFb}><FontAwesome name="book" size={22} color={GOLD} /></View>}
               <View style={s.bInfo}><Text style={s.bTitle}>{btitle(item)}</Text><Text style={s.bMeta}>{byear(item)||item?.status||'Flipbook'}</Text></View>
-              <FontAwesome name="chevron-right" size={13} color={MUTED} />
+              <FontAwesome name={canAccessYb ? 'chevron-right' : 'lock'} size={13} color={MUTED} />
             </TouchableOpacity>
           );
         }}
@@ -1169,6 +1190,12 @@ export default function YearbookScreen() {
           </Modal>
         </SafeAreaView>
       </Modal>
+      <UpgradePrompt
+        visible={upgradeVisible}
+        onClose={() => setUpgradeVisible(false)}
+        title="Unlock Yearbook"
+        featureLabel="flipbook viewing and PDF downloads"
+      />
     </SafeAreaView>
   );
 }
@@ -1178,6 +1205,26 @@ const s = StyleSheet.create({
   root:        { flex:1, backgroundColor:BG },
   centered:    { flex:1, alignItems:'center', justifyContent:'center', padding:28 },
   listPad:     { padding:16, paddingBottom:120 },
+  upgradeBanner: {
+    marginBottom: 14,
+    borderRadius: 16,
+    backgroundColor: '#263187',
+    padding: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  upgradeTitle: { color: '#ffffff', fontSize: 13, fontWeight: '900' },
+  upgradeText: { color: '#d8dff4', fontSize: 11, marginTop: 2 },
+  upgradeButton: {
+    height: 38,
+    borderRadius: 11,
+    backgroundColor: GOLD,
+    paddingHorizontal: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  upgradeButtonText: { color: NAVY, fontSize: 11, fontWeight: '900' },
 
   header:  { backgroundColor:NAVY, paddingHorizontal:20, paddingVertical:16, flexDirection:'row', alignItems:'center', gap:14 },
   hBack:   { width:42, height:42, borderRadius:13, backgroundColor:WHITE, alignItems:'center', justifyContent:'center' },

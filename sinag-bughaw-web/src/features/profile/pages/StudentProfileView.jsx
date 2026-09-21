@@ -603,7 +603,7 @@ export default function StudentProfileView() {
               <div className="mt-4 inline-flex items-center gap-2 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
                 <i className="fas fa-lock text-[#fdb813] text-sm" />
                 <span className="text-xs text-amber-800 font-semibold">Full profile visible to Premium members.</span>
-                <button onClick={() => navigate('/payment')}
+                <button onClick={() => navigate('/premium')}
                   className="bg-transparent border-none text-[#3f51b5] text-xs font-bold cursor-pointer p-0">
                   Upgrade →
                 </button>
