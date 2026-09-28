@@ -13,13 +13,15 @@ import PostContextMenu from '../components/PostContextMenu';
 import ShareModal from '../components/ShareModal';
 import PostCard from '../components/PostCard';
 import PostLightbox from '../components/PostLightbox';
-import MessageModal from '@/components/feedback/MessageModal';
+import { useChatHeads } from '@/features/messaging/context/ChatHeadsContext';
 import { useAppConfig } from '@/features/platform/AppConfigProvider';
 import { getCourseShort } from '@/utils/courseShort';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
+import { getSubscriptionTier } from '@/utils/subscription';
 
 // Helpers
 const isGraduate = (student) => !!student?.graduation_year;
+const getTier = (u) => getSubscriptionTier(u);
 const isMeaningfulText = (value, minLength = 10) => {
   const text = String(value || '').replace(/\s+/g, ' ').trim();
   const compact = text.replace(/[^a-z0-9]/gi, '').toLowerCase();
@@ -37,13 +39,6 @@ const shouldShowProfilePost = (post) => {
   if (['pending', 'rejected', 'unapproved', 'hidden', 'flagged'].includes(status)) return false;
   if (post?.is_approved === false || post?.approved === false || post?.is_public === false) return false;
   return postMediaItems(post).length > 0 || isMeaningfulText(post?.caption || post?.body || post?.message, 3);
-};
-
-const getTier = (u) => {
-  if (!u) return 'free';
-  if (u.tier === 'premium' || u.is_premium) return 'premium';
-  if (u.tier === 'standard') return 'standard';
-  return 'free';
 };
 
 const TIER_CONFIG = {
@@ -227,6 +222,7 @@ function ProfilePhotoEditor({ draft, saving, fileRef, setDraft, onCancel, onSave
 export default function ProfilePage() {
   const { id }             = useParams();
   const { user: authUser } = useAuth();
+  const { openChat }       = useChatHeads();
   const { isOn }           = useAppConfig();
   const navigate           = useNavigate();
   const [searchParams] = useSearchParams();
@@ -247,7 +243,6 @@ export default function ProfilePage() {
   });
   const [showUpload,        setShowUpload]        = useState(false);
   const [showShare,         setShowShare]         = useState(false);
-  const [showMsg,           setShowMsg]           = useState(false);
   const [posts,             setPosts]             = useState([]);
   const [postsLoading,      setPostsLoading]      = useState(false);
   const [contextMenu,       setContextMenu]       = useState(null);
@@ -373,15 +368,18 @@ export default function ProfilePage() {
     setAcademicLoading(true);
     studentsApi.show(profileId)
       .then(({ data }) => {
+        // Prefer live auth payload for own-account tier so profile matches Navbar/Directory.
+        const tierSource = isOwn && authUser ? authUser : data;
         setAcademicData({
           student_id:      data.student_id      ?? null,
           course:          data.course          ?? null,
           graduation_year: data.graduation_year ?? null,
           batch:           data.batch           ?? null,
           year_level:      data.year_level      ?? null,
-          status:          data.status          ?? data.academic_status ?? null,
-          is_premium:      data.is_premium      ?? false,
-          tier:            getTier(data),
+          status:          data.status          ?? data.academic_status
+            ?? (data.graduation_year || data.role === 'alumni' ? 'Alumni' : null),
+          is_premium:      Boolean(tierSource.is_premium),
+          tier:            getTier(tierSource),
         });
       })
       .catch(() => setAcademicData(null))
@@ -547,7 +545,7 @@ export default function ProfilePage() {
       onClick: isOwn ? openStudentIdEditor : null,
       empty: !hasStudentId,
     },
-    { value: student.graduation_year ?? student.batch ?? '2026', label: 'Batch' },
+    { value: student.graduation_year ?? student.batch ?? 'N/A', label: 'Batch' },
   ];
 
   return (
@@ -573,7 +571,6 @@ export default function ProfilePage() {
         onSave={saveProfilePhoto}
       />
       <ShareModal   isOpen={showShare} onClose={() => setShowShare(false)} student={student} />
-      <MessageModal isOpen={showMsg}   onClose={() => setShowMsg(false)}   student={student} authUser={authUser} />
       {contextMenu && (
         <PostContextMenu
           post={contextMenu.post}
@@ -671,7 +668,7 @@ export default function ProfilePage() {
                     )}
                   </>
                 ) : (
-                  <button onClick={() => setShowMsg(true)}
+                  <button onClick={() => openChat(student)}
                     className="inline-flex items-center gap-2 bg-[#1d2b4b] hover:bg-[#162038] text-white px-5 py-2 rounded-xl text-sm font-semibold border-none cursor-pointer transition">
                     <i className="fas fa-paper-plane text-[#fdb813] text-xs" /> Message
                   </button>
@@ -691,9 +688,11 @@ export default function ProfilePage() {
                   <i className="fas fa-graduation-cap text-[8px]" /> GRADUATE {student.graduation_year}
                 </span>
               )}
-              <span className="text-[10px] font-bold text-[#3f51b5] bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-full tracking-wide">
-                PIONEER 2026
-              </span>
+              {!graduate && (student.graduation_year || student.batch) && (
+                <span className="text-[10px] font-bold text-[#3f51b5] bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-full tracking-wide">
+                  PIONEER {student.graduation_year ?? student.batch}
+                </span>
+              )}
               {isOwn && (
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${tierConfig.cls}`}>
                   <i className={`fas ${tierConfig.icon} text-[8px]`} />

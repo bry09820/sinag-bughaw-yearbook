@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -12,18 +11,24 @@ class DatabaseSeeder extends Seeder
 
     /**
      * Seed the application's database.
+     *
+     * Production (Hostinger): only Admin + Settings.
+     * Local/dev: optional demo data via --class or SEED_DEMO_DATA=true.
      */
     public function run(): void
     {
         $this->call([
             AdminSeeder::class,
             SettingsSeeder::class,
-            FacultySeeder::class,
+            PremiumAccountSeeder::class,
         ]);
 
-        \App\Models\User::firstOrCreate(
-            ['email' => 'test@example.com'],
-            ['name'  => 'Test User', 'password' => bcrypt('password')]
-        );
+        if (filter_var(env('SEED_DEMO_DATA', false), FILTER_VALIDATE_BOOLEAN)) {
+            $this->call([
+                BatchSeeder::class,
+                SectionSeeder::class,
+                AlbumSeeder::class,
+            ]);
+        }
     }
 }

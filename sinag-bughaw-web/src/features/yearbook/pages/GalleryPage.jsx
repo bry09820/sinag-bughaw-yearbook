@@ -13,18 +13,12 @@ import { imageUrl } from '@/utils/imageUrl';
 import ProtectedImage from '@/components/ui/ProtectedImage';
 import { ContentOwnershipBanner } from '@/components/ui/CopyrightLabel';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
+import { getSubscriptionTier } from '@/utils/subscription';
 
 // Helpers
-
-// REMOVED: safeGetToken() no longer needed.
 // All API calls now go through the axios client which handles auth automatically.
 
-const getTier = (user) => {
-  if (!user) return 'free';
-  if (user.tier === 'premium' || user.is_premium) return 'premium';
-  if (user.tier === 'standard') return 'standard';
-  return 'free';
-};
+const getTier = (user) => getSubscriptionTier(user);
 
 // Tab config
 const TABS = [

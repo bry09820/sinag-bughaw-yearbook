@@ -5,14 +5,10 @@ import NotificationBell                from '@/components/feedback/NotificationB
 import { useState, useRef, useEffect } from 'react';
 import { messagesApi }                 from '@/api/messaging.api';
 import { useAppConfig }                from '@/features/platform/AppConfigProvider';
+import { getSubscriptionTier }         from '@/utils/subscription';
 
 // tier helper (shared logic)
-const getTier = (user) => {
-  if (!user) return 'free';
-  if (user.tier === 'premium' || user.is_premium) return 'premium';
-  if (user.tier === 'standard') return 'standard';
-  return 'free';
-};
+const getTier = (user) => getSubscriptionTier(user);
 
 // hook: live unread message count
 function useUnreadMessages() {

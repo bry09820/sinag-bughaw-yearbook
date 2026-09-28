@@ -2,7 +2,11 @@
 
 namespace App\Http\Controllers\API\Auth;
 
+use App\Contracts\FaceRecognition;
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
+use App\Models\Setting;
+use Illuminate\Http\UploadedFile;
 use App\Jobs\AI\ProcessFaceIndexing;
 use App\Jobs\Notification\SendOtpEmail;
 use App\Models\Batch;
@@ -21,9 +25,14 @@ use App\Services\Security\PasswordHistoryService;
 use App\Support\PlatformSettings;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
+use App\Support\SubscriptionAccess;
 
 class AuthController extends Controller
 {
+    public function __construct(
+        private readonly FaceRecognition $faceRecognition,
+    ) {}
+
     // Register
 
     public function register(Request $request)
@@ -214,6 +223,198 @@ class AuthController extends Controller
                 'requires_consent'  => ! $user->consent_accepted,
             ]);
         }
+    }
+
+    /**
+     * Sign in by matching a captured face against AWS Rekognition indexed students.
+     * Accepts raw or data-URI base64 JPEG/PNG from the mobile client.
+     */
+    public function faceLogin(Request $request)
+    {
+        if (PlatformSettings::bool('maintenance_mode')) {
+            return PlatformSettings::maintenanceResponse();
+        }
+
+        $request->validate([
+            'image_base64' => 'required|string',
+            'email'        => 'nullable|email',
+        ]);
+
+        $emailHint = $request->filled('email')
+            ? strtolower(trim((string) $request->input('email')))
+            : null;
+
+        $rateKey  = 'student_face_login:' . sha1(($emailHint ?? 'anon') . '|' . $request->ip());
+        $maxTries = (int) PlatformSettings::get('max_login_attempts');
+
+        if (RateLimiter::tooManyAttempts($rateKey, $maxTries)) {
+            $seconds = RateLimiter::availableIn($rateKey);
+
+            return response()->json([
+                'message' => "Too many face login attempts. Try again in {$seconds} seconds.",
+                'code'    => 'LOGIN_THROTTLED',
+            ], 429);
+        }
+
+        if (! $this->faceRecognition->isEnabled()) {
+            return response()->json([
+                'message' => 'Face recognition is not configured on the server.',
+                'code'    => 'FACE_RECOGNITION_DISABLED',
+            ], 503);
+        }
+
+        $raw = (string) $request->input('image_base64');
+        if (str_contains($raw, ',')) {
+            $raw = substr($raw, strpos($raw, ',') + 1);
+        }
+
+        $bytes = base64_decode($raw, true);
+        if ($bytes === false || strlen($bytes) < 256) {
+            RateLimiter::hit($rateKey, 60 * (int) PlatformSettings::get('session_timeout_minutes'));
+
+            return response()->json([
+                'message' => 'Invalid face image payload.',
+                'code'    => 'INVALID_FACE_IMAGE',
+            ], 422);
+        }
+
+        $tmpPath = tempnam(sys_get_temp_dir(), 'face_login_');
+        if ($tmpPath === false) {
+            return response()->json([
+                'message' => 'Unable to process face image on the server.',
+            ], 500);
+        }
+
+        $imagePath = $tmpPath . '.jpg';
+        @rename($tmpPath, $imagePath);
+        file_put_contents($imagePath, $bytes);
+
+        $uploaded = new UploadedFile(
+            $imagePath,
+            'face-login.jpg',
+            'image/jpeg',
+            null,
+            true
+        );
+
+        try {
+            $threshold = (float) Setting::getValue('face_recognition_threshold', '75');
+            $result    = $this->faceRecognition->searchIndexedFaces($uploaded, 5, $threshold);
+        } catch (\Throwable $e) {
+            Log::warning('Face login failed', ['error' => $e->getMessage()]);
+            RateLimiter::hit($rateKey, 60 * (int) PlatformSettings::get('session_timeout_minutes'));
+
+            return response()->json([
+                'message' => 'Face verification failed due to a server error.',
+                'code'    => 'FACE_LOGIN_ERROR',
+            ], 500);
+        } finally {
+            @unlink($imagePath);
+            if (is_file($tmpPath)) {
+                @unlink($tmpPath);
+            }
+        }
+
+        $status = (string) ($result['status'] ?? '');
+        if (in_array($status, ['disabled', 'error', 'no_face'], true)) {
+            RateLimiter::hit($rateKey, 60 * (int) PlatformSettings::get('session_timeout_minutes'));
+
+            $message = match ($status) {
+                'disabled' => 'Face recognition is not configured on the server.',
+                'no_face'  => 'No face was detected in the captured image. Please try again.',
+                default    => (string) ($result['message'] ?? 'Face verification failed.'),
+            };
+
+            return response()->json([
+                'message' => $message,
+                'code'    => strtoupper($status === 'disabled' ? 'FACE_RECOGNITION_DISABLED' : $status),
+            ], $status === 'disabled' ? 503 : 401);
+        }
+
+        $matches = collect($result['matches'] ?? [])
+            ->filter(fn ($match) => filled($match['account_user_id'] ?? null))
+            ->sortByDesc(fn ($match) => (float) ($match['similarity'] ?? 0))
+            ->values();
+
+        if ($matches->isEmpty()) {
+            RateLimiter::hit($rateKey, 60 * (int) PlatformSettings::get('session_timeout_minutes'));
+            AuditLog::record($request, 'Face Login Failed', 'No matching indexed face', AuditLog::STATUS_FAILED);
+
+            return response()->json([
+                'message' => 'Face not recognized. Please try again or sign in with email and password.',
+                'code'    => 'FACE_NOT_RECOGNIZED',
+            ], 401);
+        }
+
+        $user = null;
+
+        if ($emailHint) {
+            $hintUser = User::whereRaw('LOWER(TRIM(email)) = ?', [$emailHint])->first();
+            if (! $hintUser) {
+                RateLimiter::hit($rateKey, 60 * (int) PlatformSettings::get('session_timeout_minutes'));
+
+                return response()->json([
+                    'message' => 'Face not recognized for this account.',
+                    'code'    => 'FACE_NOT_RECOGNIZED',
+                ], 401);
+            }
+
+            $matchedHint = $matches->first(
+                fn ($match) => (int) $match['account_user_id'] === (int) $hintUser->id
+            );
+
+            if (! $matchedHint) {
+                RateLimiter::hit($rateKey, 60 * (int) PlatformSettings::get('session_timeout_minutes'));
+                AuditLog::record($request, 'Face Login Failed', "Face did not match email {$emailHint}", AuditLog::STATUS_FAILED);
+
+                return response()->json([
+                    'message' => 'Face not recognized for this account.',
+                    'code'    => 'FACE_NOT_RECOGNIZED',
+                ], 401);
+            }
+
+            $user = $hintUser;
+        } else {
+            $user = User::query()->find((int) $matches->first()['account_user_id']);
+        }
+
+        if (! $user) {
+            RateLimiter::hit($rateKey, 60 * (int) PlatformSettings::get('session_timeout_minutes'));
+
+            return response()->json([
+                'message' => 'Face not recognized. Please try again or sign in with email and password.',
+                'code'    => 'FACE_NOT_RECOGNIZED',
+            ], 401);
+        }
+
+        if (! empty($user->suspended_at) || (method_exists($user, 'trashed') && $user->trashed())) {
+            return response()->json([
+                'message' => 'Account is suspended or unavailable.',
+                'code'    => 'ACCOUNT_UNAVAILABLE',
+            ], 403);
+        }
+
+        RateLimiter::clear($rateKey);
+
+        $token = $user->createToken('app-token')->plainTextToken;
+        $this->markPresence($user->id, true);
+
+        AuditLog::record(
+            $request,
+            'Face Login Success',
+            "User #{$user->id} authenticated via face recognition"
+        );
+
+        $user->load('studentRecord', 'section');
+
+        return response()->json([
+            'message'          => 'Face login successful.',
+            'user'             => $this->authUserPayload($user),
+            'token'            => $token,
+            'access_token'     => $token,
+            'requires_consent' => ! $user->consent_accepted,
+        ]);
+
     }
 
     // Student lookup
@@ -448,17 +649,8 @@ class AuthController extends Controller
     {
         $user = $request->user()->load('studentRecord', 'section');
         $this->markPresence($user->id, true);
-        $sub       = \App\Models\Subscription::where('user_id', $user->id)->latest()->first();
-        $activeSub = $sub?->isActive() ? $sub : null;
 
-        return response()->json([
-            ...$user->toArray(),
-            'is_subscribed'         => (bool) $activeSub,
-            'is_premium'            => $activeSub?->isPremium() ?? false,
-            'subscription_status'   => $activeSub?->tier ?? 'free',
-            'tier'                  => $activeSub?->tier ?? 'free',
-            'plan'                  => $activeSub?->plan ?? 'free',
-        ]);
+        return response()->json($this->authUserPayload($user));
     }
 
     // Private helpers
@@ -511,24 +703,34 @@ class AuthController extends Controller
 
     private function authUserPayload(User $user): array
     {
-        return [
-            'id'                => $user->id,
-            'first_name'        => $user->first_name,
-            'last_name'         => $user->last_name,
-            'name'              => $user->name,
-            'email'             => $user->email,
-            'role'              => $user->role,
-            'student_record_id' => $user->student_record_id,
-            'student_id'        => $user->student_id,
-            'course'            => $user->course,
-            'graduation_year'   => $user->graduation_year,
-            'batch'             => $user->batch,
-            'section_id'        => $user->section_id,
-            'batch_id'          => $user->batch_id,
-            'profile_picture'   => $user->profile_picture,
-            'email_verified'    => (bool) $user->email_verified,
-            'consent_accepted'  => (bool) $user->consent_accepted,
-        ];
+        $user->loadMissing('studentRecord', 'section');
+
+        return array_merge([
+            'id'                  => $user->id,
+            'first_name'          => $user->first_name,
+            'last_name'           => $user->last_name,
+            'name'                => $user->name,
+            'email'               => $user->email,
+            'role'                => $user->role,
+            'student_record_id'   => $user->student_record_id,
+            'student_id'          => $user->student_id,
+            'course'              => $user->course,
+            'graduation_year'     => $user->graduation_year,
+            'batch'               => $user->batch,
+            'section_id'          => $user->section_id,
+            'batch_id'            => $user->batch_id,
+            'profile_picture'     => $user->profile_picture,
+            'bio'                 => $user->bio,
+            'motto'               => $user->motto,
+            // Required by web + mobile settings — without this, clients always default to "public".
+            'profile_visibility'  => $user->profile_visibility ?: 'public',
+            'visibility'          => $user->profile_visibility ?: 'public',
+            'email_verified'      => (bool) $user->email_verified,
+            'consent_accepted'    => (bool) $user->consent_accepted,
+            'section'             => $user->section,
+            'student_record'      => $user->studentRecord,
+            'studentRecord'       => $user->studentRecord,
+        ], SubscriptionAccess::payload($user));
     }
 
     private function sendVerificationOtp(string $email): void

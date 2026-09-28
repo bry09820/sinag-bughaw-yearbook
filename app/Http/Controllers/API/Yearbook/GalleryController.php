@@ -478,9 +478,7 @@ class GalleryController extends Controller
 
     private function requireSubscribed(Request $request): ?JsonResponse
     {
-        $sub = Subscription::where('user_id', $request->user()?->id)->latest()->first();
-
-        if (! $sub?->isStandard()) {
+        if (! \App\Support\SubscriptionAccess::isStandard($request->user())) {
             return response()->json([
                 'success' => false,
                 'message' => 'Gallery uploads require a Standard or Premium subscription.',

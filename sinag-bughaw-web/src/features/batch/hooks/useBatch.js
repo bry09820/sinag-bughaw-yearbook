@@ -1,16 +1,15 @@
 ﻿import { useState, useEffect, useCallback } from 'react';
 import { batchApi, sectionsApi } from '@/api/batch.api';
 import { useAuth } from '@/features/auth/hooks/useAuth';
+import { hasPaidAccess } from '@/utils/subscription';
 
 // useBatch
 
 export function useBatch() {
   const { user } = useAuth();
 
-  // Derived directly from the auth user object (populated by authApi.me()).
-  //    Never false while waiting for a separate API response.
-  // user.is_premium is set by AuthController::me() already in context.
-  const isPremium = user?.is_premium === true || user?.tier === 'premium';
+  // Standard + Premium both unlock paid discovery/batchmate features.
+  const isPremium = hasPaidAccess(user);
 
   const [batchmates,   setBatchmates]   = useState([]);
   const [batches,      setBatches]      = useState({});
@@ -70,7 +69,7 @@ export function useBatch() {
 
   return {
     user,
-    isPremium,        // always correct from auth context, no delay
+    isPremium,        // paid access from shared subscription helpers
     batchmates,
     batches,
     departments,
@@ -89,8 +88,7 @@ export function useBatch() {
 export function useSection(sectionId = null) {
   const { user } = useAuth();
 
-  // Derived from auth context, not API response state
-  const isPremium = user?.is_premium === true || user?.tier === 'premium';
+  const isPremium = hasPaidAccess(user);
 
   const [sections,  setSections]  = useState([]);
   const [section,   setSection]   = useState(null);
@@ -130,6 +128,6 @@ export function useSection(sectionId = null) {
     counts,
     loading,
     error,
-    isPremium,       
+    isPremium,
   };
 }

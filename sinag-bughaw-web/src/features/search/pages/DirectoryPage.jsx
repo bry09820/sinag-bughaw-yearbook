@@ -451,9 +451,9 @@ export default function DirectoryPage() {
             className="mb-6 w-full flex items-center gap-4 rounded-2xl bg-[#263187] px-5 py-4 text-left border-0 cursor-pointer"
           >
             <div className="flex-1 min-w-0">
-              <p className="m-0 text-white text-sm font-black">Directory profiles locked</p>
+              <p className="m-0 text-white text-sm font-black">Unlock full directory profiles</p>
               <p className="m-0 mt-1 text-[#d8dff4] text-xs">
-                Free accounts can browse the directory. Upgrade to open full student profiles.
+                Free accounts can browse and message classmates. Upgrade for full yearbook details.
               </p>
             </div>
             <span className="shrink-0 rounded-xl bg-[#fdb813] text-[#102044] text-xs font-black px-4 py-2.5">
@@ -494,7 +494,7 @@ export default function DirectoryPage() {
                   index={i}
                   isMatched={matchedIds.has(studentUserId(student))}
                   matchData={faceMatches.find(m => m.user_id === studentUserId(student))}
-                  locked={profilesLocked}
+                  locked={false}
                   onLockedPress={promptUpgrade}
                 />
               ))}

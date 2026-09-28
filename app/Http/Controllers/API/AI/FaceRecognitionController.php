@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\API\AI;
 
 use App\Contracts\FaceRecognition;
-use Aws\Rekognition\RekognitionClient;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\TaggedPhotoResource;
 use App\Jobs\AI\AnalyzePhotoFaces;
@@ -16,6 +15,7 @@ use App\Models\TaggedPhoto;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class FaceRecognitionController extends Controller
 {
@@ -23,10 +23,18 @@ class FaceRecognitionController extends Controller
         private readonly FaceRecognition $faceRecognition,
     ) {}
 
-    // Sync all student profile pictures into Rekognition 
-
+    /**
+     * Index faces into AWS Rekognition.
+     *
+     * Mobile (authenticated student): POST { image_base64, student_id? }
+     * Admin bulk sync (no image_base64): re-index all students with profile photos.
+     */
     public function syncStudents(Request $request): JsonResponse
     {
+        if ($request->filled('image_base64')) {
+            return $this->registerFaceFromBase64($request);
+        }
+
         $this->ensureAdmin($request);
 
         try {
@@ -62,6 +70,156 @@ class FaceRecognitionController extends Controller
                 'message' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Real-time face registration from a mobile base64 capture.
+     * Indexes the face into AWS Rekognition ONLY — does not change profile_picture.
+     */
+    private function registerFaceFromBase64(Request $request): JsonResponse
+    {
+        $actor = $request->user();
+
+        if (! $actor) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication required.',
+            ], 401);
+        }
+
+        $request->validate([
+            'image_base64' => 'required|string',
+            'student_id'   => 'nullable|string|max:255',
+            'user_id'      => 'nullable|integer',
+        ]);
+
+        if (! $this->faceRecognition->isEnabled()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Face recognition is not configured on the server.',
+                'code'    => 'FACE_RECOGNITION_DISABLED',
+            ], 503);
+        }
+
+        $target = $this->resolveFaceSyncTarget($request, $actor);
+
+        if (! $target) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Student identifier does not match an allowed account.',
+                'code'    => 'STUDENT_MISMATCH',
+            ], 403);
+        }
+
+        $raw = (string) $request->input('image_base64');
+        if (str_contains($raw, ',')) {
+            $raw = substr($raw, strpos($raw, ',') + 1);
+        }
+
+        $bytes = base64_decode($raw, true);
+        if ($bytes === false || strlen($bytes) < 256) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid face image payload.',
+                'code'    => 'INVALID_FACE_IMAGE',
+            ], 422);
+        }
+
+        try {
+            $indexResult = $this->faceRecognition->indexStudentFromBytes(
+                $target->loadMissing('studentRecord'),
+                $bytes
+            );
+        } catch (\Throwable $e) {
+            Log::warning('Face sync failed', [
+                'user_id' => $target->id,
+                'error'   => $e->getMessage(),
+            ]);
+            AuditLog::record($request, 'Face Sync Error', $e->getMessage(), 'Warning');
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to register face. Please try again.',
+                'code'    => 'FACE_SYNC_ERROR',
+            ], 500);
+        }
+
+        if (! ($indexResult['indexed'] ?? false)) {
+            AuditLog::record(
+                $request,
+                'Face Sync Failed',
+                $indexResult['reason'] ?? 'No face indexed',
+                'Failed'
+            );
+
+            return response()->json([
+                'success' => false,
+                'message' => $indexResult['reason']
+                    ?? 'No usable face was detected. Please retake the photo in good lighting.',
+                'code'    => 'FACE_NOT_INDEXED',
+            ], 422);
+        }
+
+        AuditLog::record(
+            $request,
+            'Face Sync Success',
+            "User #{$target->id} face indexed via mobile sync (Rekognition only; profile_picture unchanged)"
+        );
+
+        return response()->json([
+            'success'           => true,
+            'message'           => 'Face registered successfully.',
+            'indexed'           => true,
+            'user_id'           => $target->id,
+            'student_id'        => $target->student_id,
+            'external_image_id' => $indexResult['external_image_id'] ?? null,
+            'face_records'      => $indexResult['face_records'] ?? 0,
+        ]);
+    }
+
+    /**
+     * Resolve which user account the face should be indexed against.
+     */
+    private function resolveFaceSyncTarget(Request $request, User $actor): ?User
+    {
+        $isAdmin = in_array($actor->role, ['admin', 'super_admin'], true);
+        $studentId = $request->filled('student_id')
+            ? trim((string) $request->input('student_id'))
+            : null;
+        $userId = $request->filled('user_id')
+            ? (int) $request->input('user_id')
+            : null;
+
+        if ($userId) {
+            if (! $isAdmin && $userId !== (int) $actor->id) {
+                return null;
+            }
+
+            return User::with('studentRecord')->find($userId);
+        }
+
+        if ($studentId !== null && $studentId !== '') {
+            $matchesSelf =
+                (string) $actor->student_id === $studentId
+                || (string) $actor->id === $studentId
+                || (string) ($actor->student_record_id ?? '') === $studentId;
+
+            if ($matchesSelf) {
+                return $actor->loadMissing('studentRecord');
+            }
+
+            if (! $isAdmin) {
+                return null;
+            }
+
+            return User::with('studentRecord')
+                ->where('student_id', $studentId)
+                ->orWhere('id', $studentId)
+                ->orWhere('student_record_id', $studentId)
+                ->first();
+        }
+
+        return $actor->loadMissing('studentRecord');
     }
 
     // Search for a student by uploaded face photo 

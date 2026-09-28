@@ -67,7 +67,14 @@ const getStudentSection = (student: any) => student?.section?.name || student?.s
 const getStudentYear = (student: any) => student?.batch_year || student?.year_level || student?.year || student?.batch?.year || student?.graduation_year || new Date().getFullYear();
 const getStudentPhoto = (student: any) => imageUrl(student?.profile_picture || student?.profile_pic || student?.photo || student?.avatar);
 const getInitials = (name = '') => name.trim().split(/\s+/).map((word) => word[0]?.toUpperCase() || '').slice(0, 2).join('') || 'NU';
-const getRecipientId = (student: any) => student?.user_id || student?.account_user_id || student?.user?.id || student?.student?.user_id || student?.student?.account_user_id || student?.id;
+const getRecipientId = (student: any) =>
+  student?.user_id ||
+  student?.account_user_id ||
+  student?.user?.id ||
+  student?.student?.user_id ||
+  student?.student?.account_user_id ||
+  (student?.id && student?.role ? student.id : null) ||
+  (student?.user_id === undefined && student?.account_user_id === undefined && !student?.student_record_id ? student?.id : null);
 const faceMatchId = (match: any) => match?.user_id || match?.student_id || match?.id;
 const collectOwnDirectoryIds = (user: any) => {
   const student = user?.student_record || user?.studentRecord || user?.student || {};
@@ -363,10 +370,6 @@ export default function DirectoryScreen() {
 
   const toggleModal = (visible: boolean, student: any = null) => {
     if (visible) {
-      if (!canOpenProfiles && !isOwnDirectoryEntry(student, ownDirectoryIds)) {
-        setUpgradeVisible(true);
-        return;
-      }
       setSelectedStudent(student);
       setSelectedAchievements([]);
       setVoiceNotes([]);
@@ -529,13 +532,9 @@ export default function DirectoryScreen() {
           const userId = getRecipientId(item);
           const studentRecordId = item?.student_record_id || item?.student?.id || item?.record?.id;
           const profileId = studentRecordId || userId || getStudentId(item);
-          const isOwn = isOwnDirectoryEntry(item, ownDirectoryIds);
 
-          if (!canOpenProfiles && !isOwn) {
-            setUpgradeVisible(true);
-            return;
-          }
-
+          // Direct messaging is available to all registered students.
+          // Free users can open the profile entry point to Message; full yearbook details remain soft-gated by the API.
           if (profileId) {
             router.push({
               pathname: '/student/[id]',
@@ -641,9 +640,9 @@ export default function DirectoryScreen() {
                 onPress={() => setUpgradeVisible(true)}
               >
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.upgradeTitle}>Directory profiles locked</Text>
+                  <Text style={styles.upgradeTitle}>Unlock full directory profiles</Text>
                   <Text style={styles.upgradeText}>
-                    Free accounts can browse the list. Upgrade to open full student profiles and yearbook details.
+                    Free accounts can browse and message classmates. Upgrade for full yearbook details.
                   </Text>
                 </View>
                 <View style={styles.upgradeButton}>

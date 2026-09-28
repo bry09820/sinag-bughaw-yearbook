@@ -23,7 +23,7 @@ class SocialAuthController extends Controller
     private function isAllowedMobileRedirect(?string $redirectUri): bool
     {
         return is_string($redirectUri)
-            && preg_match('/^(nuyearbook:\/\/|capstoneapp:\/\/|exp:\/\/|http:\/\/localhost|http:\/\/127\.0\.0\.1|https:\/\/[a-z0-9\-]+\.ngrok-free\.dev|https:\/\/yearbook-myji\.onrender\.com)/', $redirectUri);
+            && preg_match('/^(nuyearbook:\/\/|capstoneapp:\/\/|exp:\/\/|http:\/\/localhost|http:\/\/127\.0\.0\.1|http:\/\/172\.20\.10\.\d+|https:\/\/[a-z0-9\-]+\.ngrok-free\.dev|https:\/\/yearbook-myji\.onrender\.com)/', $redirectUri);
     }
 
     private function encodeMobileState(string $redirectUri): string

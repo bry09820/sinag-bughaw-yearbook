@@ -58,15 +58,18 @@ export default function UpgradePrompt({
 }
 
 export function hasPaidAccess(user: any) {
+  const role = String(user?.role || '').toLowerCase();
+  const tier = String(user?.tier || user?.subscription_status || '').toLowerCase();
+
   return Boolean(
-    user?.role === 'admin' ||
+    ['admin', 'super_admin', 'premium'].includes(role) ||
+      role === 'standard' ||
       user?.is_premium ||
       user?.is_subscribed ||
+      user?.is_standard ||
       user?.premium ||
-      user?.tier === 'premium' ||
-      user?.tier === 'standard' ||
-      user?.subscription_status === 'premium' ||
-      user?.subscription_status === 'standard' ||
+      tier === 'premium' ||
+      tier === 'standard' ||
       user?.subscription?.active ||
       user?.subscription_status === 'active'
   );

@@ -8,6 +8,9 @@ import { recordProfileView } from '@/api/analytics.api';
 import { trackProfileView } from '@/utils/ga4';
 import api from '@/services/api';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
+import { useAuth } from '@/features/auth/hooks/useAuth';
+import { hasPaidAccess } from '@/utils/subscription';
+import { useChatHeads } from '@/features/messaging/context/ChatHeadsContext';
 
 const discoveryStudentApi = {
   show: (id) => api.get(`/discover/students/${id}`),
@@ -120,6 +123,8 @@ const TABS = [
 export default function DiscoveryStudentProfile() {
   const { id }   = useParams();
   const navigate = useNavigate();
+  const { user: authUser } = useAuth();
+  const { openChat } = useChatHeads();
 
   const [student,   setStudent]   = useState(null);
   const [loading,   setLoading]   = useState(true);
@@ -183,7 +188,9 @@ export default function DiscoveryStudentProfile() {
 
   const photoSrc      = student.photo_url ?? student.photo ?? null;
   const shortCourse   = COURSE_LABELS[student.course] ?? student.course ?? 'Student';
-  const canViewFull   = student.is_premium_viewer === true;
+  const canViewFull   = student.is_premium_viewer === true
+    || student.is_subscribed_viewer === true
+    || hasPaidAccess(authUser);
   const honors        = safeArray(student.honors);
   const organizations = safeArray(student.organizations);
   const achievements  = safeArray(student.achievements);
@@ -197,6 +204,21 @@ export default function DiscoveryStudentProfile() {
     || student.most_likely_to;
 
   const hasMessages = student.message_to_batchmates || student.message_to_parents;
+  const messageTargetId = student.user_id ?? null;
+  const canMessage = Boolean(
+    authUser?.id
+    && messageTargetId
+    && String(messageTargetId) !== String(authUser.id)
+  );
+  const messageTarget = canMessage
+    ? {
+        id: messageTargetId,
+        user_id: messageTargetId,
+        name: displayName,
+        profile_picture: photoSrc,
+        course: student.course,
+      }
+    : null;
 
   const avatarFallback = (
     <div className="w-full h-full flex items-center justify-center text-3xl font-black text-[#fdb813]">
@@ -461,8 +483,18 @@ export default function DiscoveryStudentProfile() {
                 <div className="absolute bottom-2 right-2 w-3.5 h-3.5 rounded-full bg-emerald-400 border-2 border-white" />
               </div>
 
-              {/* Share */}
+              {/* Actions — messaging available to all registered students */}
               <div className="flex items-center gap-2 pt-14 sm:pt-16">
+                {canMessage && (
+                  <button
+                    type="button"
+                    onClick={() => openChat(messageTarget)}
+                    className="inline-flex items-center gap-2 rounded-xl border-none bg-[#1d2b4b] px-4 py-2.5
+                               text-xs font-black text-white cursor-pointer transition hover:bg-[#162038]"
+                  >
+                    <i className="fas fa-paper-plane text-[#fdb813]" /> Message
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     navigator.clipboard?.writeText(window.location.href);
@@ -604,9 +636,19 @@ export default function DiscoveryStudentProfile() {
               </p>
               <h2 className="m-0 text-xl font-black text-[#1d2b4b]">Upgrade to view full profile</h2>
               <p className="mx-auto mt-3 mb-0 max-w-sm text-sm leading-relaxed text-slate-500">
-                Premium unlocks academic details, yearbook messages, mottos, memories, and contact links.
+                Premium unlocks academic details, yearbook dedications, mottos, memories, and contact links.
+                Direct messaging stays available on free accounts.
               </p>
               <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+                {canMessage && (
+                  <button
+                    type="button"
+                    onClick={() => openChat(messageTarget)}
+                    className="rounded-xl border-none bg-[#1d2b4b] px-5 py-3 text-sm font-black text-white cursor-pointer transition hover:bg-[#162038]"
+                  >
+                    <i className="fas fa-paper-plane text-[#fdb813] mr-2" /> Message
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => navigate('/premium')}

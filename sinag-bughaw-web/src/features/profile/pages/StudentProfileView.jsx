@@ -5,7 +5,7 @@ import Footer from '@/components/layout/Footer';
 import { studentsApi } from '@/api/student.api';
 import { profileApi } from '@/api/gallery.api';
 import { useAuth } from '@/features/auth/hooks/useAuth';
-import MessageModal from '@/components/feedback/MessageModal';
+import { useChatHeads } from '@/features/messaging/context/ChatHeadsContext';
 import ShareModal from '@/features/profile/components/ShareModal';
 import PremiumBadge from '@/features/subscription/components/PremiumBadge';
 import SubscriptionGate from '@/features/subscription/components/SubscriptionGate';
@@ -18,6 +18,7 @@ import { recordProfileView } from '@/api/analytics.api';
 import { trackProfileView } from '@/utils/ga4';
 import { getCourseShort } from '@/utils/courseShort';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
+import { hasPaidAccess } from '@/utils/subscription';
 
 // Helpers
 const isGraduate = (student) => !!student?.graduation_year;
@@ -39,12 +40,50 @@ const shouldShowProfilePost = (post) => {
   if (post?.is_approved === false || post?.approved === false || post?.is_public === false) return false;
   return postMediaItems(post).length > 0 || isMeaningfulText(post?.caption || post?.body || post?.message, 3);
 };
-const isPaidViewer = (viewer) => {
-  if (!viewer) return false;
-  const tier = String(viewer.tier || '').toLowerCase();
-  const plan = String(viewer.plan || '').toLowerCase();
-  return Boolean(viewer.is_premium || ['standard', 'premium'].includes(tier) || plan.startsWith('premium'));
+
+/** Resolve the users.id needed for messaging (never bare students.id for unregistered). */
+const resolveMessageRecipient = (person, { routeId = null, allowFallbackId = true } = {}) => {
+  if (!person && !routeId) return null;
+  const linked = person?.user_id ?? person?.account_user_id ?? person?.user?.id;
+  if (linked != null && linked !== '') {
+    const id = Number(linked);
+    return Number.isFinite(id) && id > 0 ? id : null;
+  }
+  if (!allowFallbackId) return null;
+  const id = Number(person?.id ?? routeId);
+  return Number.isFinite(id) && id > 0 ? id : null;
 };
+
+const buildMessageTarget = (person, { routeId = null, allowFallbackId = true } = {}) => {
+  const recipientId = resolveMessageRecipient(person, { routeId, allowFallbackId });
+  if (!recipientId || !person) return null;
+  const name = person.name
+    || [person.first_name, person.last_name].filter(Boolean).join(' ')
+    || 'Student';
+  return {
+    id: recipientId,
+    name,
+    profile_picture: person.profile_picture || person.photo || person.avatar || null,
+    course: person.course || person.course_short || null,
+  };
+};
+
+const academicStatusFor = (student) => {
+  if (!student) return 'N/A';
+  if (student.status || student.academic_status) return student.status || student.academic_status;
+  if (isGraduate(student) || student.role === 'alumni') return 'Alumni';
+  return 'Enrolled';
+};
+
+const yearLevelLabel = (student) => {
+  if (!student?.year_level) return 'N/A';
+  const n = Number(student.year_level);
+  if (!Number.isFinite(n)) return String(student.year_level);
+  const suffix = n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th';
+  return `${n}${suffix} Year`;
+};
+
+const RESTRICTED_VISIBILITIES = ['subscription', 'private', 'batchmates', 'alumni_only', 'unregistered', 'unavailable'];
 
 // Sub-components
 function SkeletonBlock({ w = '60%', h = 11 }) {
@@ -116,7 +155,7 @@ const publicStudentField = (student, ...keys) => {
   return '';
 };
 
-function RestrictedProfileView({ student, visibility, authUser, onBack, onLogin }) {
+function RestrictedProfileView({ student, visibility, authUser, onBack, onLogin, onMessage, canMessage = false }) {
   const name = publicStudentField(student, 'name', 'full_name')
     || [publicStudentField(student, 'first_name'), publicStudentField(student, 'last_name')].filter(Boolean).join(' ')
     || 'Student Profile';
@@ -127,7 +166,14 @@ function RestrictedProfileView({ student, visibility, authUser, onBack, onLogin 
   const batch = publicStudentField(student, 'graduation_year', 'batch_year', 'batch') || student?.section?.batch_year || student?.batch?.graduation_year;
   const isBatchmatesOnly = visibility === 'batchmates' || visibility === 'alumni_only';
   const isSubscriptionLimited = visibility === 'subscription';
-  const badge = isSubscriptionLimited ? 'Free Tier' : isBatchmatesOnly ? 'Batchmates Only' : 'Private Profile';
+  const isUnregistered = visibility === 'unregistered' || visibility === 'unavailable';
+  const badge = isSubscriptionLimited
+    ? 'Free Tier'
+    : isBatchmatesOnly
+      ? 'Batchmates Only'
+      : isUnregistered
+        ? 'Unregistered'
+        : 'Private Profile';
   const metaSeparator = ' · ';
   const details = [rawCourse || course, 'National University Lipa'].filter(Boolean).join(' · ');
   const profileMeta = [details, sectionName].filter(Boolean).join(metaSeparator);
@@ -174,13 +220,17 @@ function RestrictedProfileView({ student, visibility, authUser, onBack, onLogin 
                 </div>
 
                 <div className="flex items-center gap-2 pb-2 pt-14">
-                  <button
-                    type="button"
-                    disabled
-                    className="hidden cursor-not-allowed items-center gap-2 rounded-xl border-none bg-[#1d2b4b] px-4 py-2.5 text-xs font-black text-white opacity-60 sm:inline-flex"
-                  >
-                    <i className="fas fa-paper-plane text-[#fdb813]" /> Message
-                  </button>
+                  {loggedIn && (
+                    <button
+                      type="button"
+                      onClick={onMessage}
+                      disabled={!canMessage}
+                      title={canMessage ? 'Send a message' : 'Messaging unavailable for this profile'}
+                      className="hidden items-center gap-2 rounded-xl border-none bg-[#1d2b4b] px-4 py-2.5 text-xs font-black text-white transition hover:bg-[#162038] disabled:cursor-not-allowed disabled:opacity-50 sm:inline-flex"
+                    >
+                      <i className="fas fa-paper-plane text-[#fdb813]" /> Message
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50"
@@ -270,6 +320,7 @@ function RestrictedProfileView({ student, visibility, authUser, onBack, onLogin 
 export default function StudentProfileView() {
   const { id }             = useParams();
   const { user: authUser } = useAuth();
+  const { openChat }       = useChatHeads();
   const navigate           = useNavigate();
   const [searchParams]     = useSearchParams();
 
@@ -278,7 +329,6 @@ export default function StudentProfileView() {
   const [loading,          setLoading]          = useState(true);
   const [visibility,       setVisibility]       = useState(null);
   const [activeTab,        setActiveTab]        = useState('posts');
-  const [showMsg,          setShowMsg]          = useState(false);
   const [showShare,        setShowShare]        = useState(false);
   const [posts,            setPosts]            = useState([]);
   const [postsRestricted,  setPostsRestricted]  = useState(false);
@@ -290,7 +340,11 @@ export default function StudentProfileView() {
   const [achieveLoading,   setAchieveLoading]   = useState(false);
   const postParam = searchParams.get('post');
 
-  const canViewFull = Boolean(student?.is_subscribed_viewer || isPaidViewer(authUser));
+  const canViewFull = Boolean(student?.is_subscribed_viewer || hasPaidAccess(authUser));
+  const messageSource = student ?? restrictedStudent;
+  const allowMessageFallbackId = !['unregistered', 'unavailable'].includes(visibility);
+  const messageTarget = buildMessageTarget(messageSource, { routeId: id, allowFallbackId: allowMessageFallbackId });
+  const canMessage = Boolean(authUser?.id && messageTarget?.id && String(messageTarget.id) !== String(authUser.id));
 
   // Build tabs dynamically Yearbook only for graduates
   const TABS = [
@@ -314,6 +368,13 @@ export default function StudentProfileView() {
     setLoading(true);
     studentsApi.show(id)
       .then(({ data }) => {
+        // HTTP 200 restricted envelopes (unregistered / unavailable / subscription soft gate)
+        if (data?.restricted || RESTRICTED_VISIBILITIES.includes(data?.visibility)) {
+          setStudent(null);
+          setRestrictedStudent(data.student ?? data);
+          setVisibility(data.visibility ?? 'unavailable');
+          return;
+        }
         setStudent(data);
         setRestrictedStudent(null);
         setVisibility(null);
@@ -389,6 +450,18 @@ export default function StudentProfileView() {
     setTimeout(() => setToast(null), 3000);
   };
 
+  const openMessage = () => {
+    if (!authUser) {
+      navigate('/login');
+      return;
+    }
+    if (!canMessage) {
+      showToastMsg('This student record is not linked to a user account yet.', 'error');
+      return;
+    }
+    openChat(messageTarget || student);
+  };
+
   const handlePostDeleted = (pid) => { setPosts(p => p.filter(x => x.id !== pid)); showToastMsg('Post deleted.', 'error'); setContextMenu(null); };
   const handlePostUpdated = (u)   => { setPosts(p => p.map(x => x.id === u.id ? { ...x, ...u } : x)); showToastMsg('Updated!'); setContextMenu(null); };
   const handleReportPost = async (post) => {
@@ -417,14 +490,26 @@ export default function StudentProfileView() {
   );
 
   // Not found / private
-  if (!student && ['subscription', 'private', 'batchmates', 'alumni_only'].includes(visibility)) return (
-    <RestrictedProfileView
-      student={restrictedStudent}
-      visibility={visibility}
-      authUser={authUser}
-      onBack={() => navigate('/directory')}
-      onLogin={() => navigate('/login')}
-    />
+  if (!student && RESTRICTED_VISIBILITIES.includes(visibility)) return (
+    <>
+      {toast && (
+        <div className={`fixed top-20 left-1/2 z-[9000] -translate-x-1/2 animate-[fadeIn_0.2s_ease] px-5 py-2.5 rounded-xl text-sm font-semibold shadow-xl
+                         whitespace-nowrap flex items-center gap-2
+                         ${toast.type === 'error' ? 'bg-red-600 text-white' : 'bg-[#1d2b4b] text-white'}`}>
+          <i className={`fas ${toast.type === 'error' ? 'fa-circle-xmark' : 'fa-circle-check'} text-[#fdb813]`} />
+          {toast.msg}
+        </div>
+      )}
+      <RestrictedProfileView
+        student={restrictedStudent}
+        visibility={visibility}
+        authUser={authUser}
+        onBack={() => navigate('/directory')}
+        onLogin={() => navigate('/login')}
+        onMessage={openMessage}
+        canMessage={canMessage}
+      />
+    </>
   );
 
   if (!student) return (
@@ -455,7 +540,6 @@ export default function StudentProfileView() {
     <div className="min-h-screen bg-[#f4f7fe] flex flex-col font-sans">
       <Navbar />
 
-      <MessageModal isOpen={showMsg}   onClose={() => setShowMsg(false)}   student={student} authUser={authUser} />
       <ShareModal   isOpen={showShare} onClose={() => setShowShare(false)} student={student} />
       {contextMenu && (
         <PostContextMenu post={contextMenu.post} position={{ x: contextMenu.x, y: contextMenu.y }}
@@ -508,8 +592,10 @@ export default function StudentProfileView() {
 
               {/* Actions */}
               <div className="flex items-center gap-2 pt-14 sm:pt-16">
-                <button onClick={() => setShowMsg(true)}
-                  className="inline-flex items-center gap-2 bg-[#1d2b4b] hover:bg-[#162038] text-white px-5 py-2 rounded-xl text-sm font-semibold border-none cursor-pointer transition">
+                <button onClick={openMessage}
+                  disabled={!canMessage}
+                  title={canMessage ? 'Send a message' : 'Messaging unavailable for this profile'}
+                  className="inline-flex items-center gap-2 bg-[#1d2b4b] hover:bg-[#162038] text-white px-5 py-2 rounded-xl text-sm font-semibold border-none cursor-pointer transition disabled:cursor-not-allowed disabled:opacity-50">
                   <i className="fas fa-paper-plane text-[#fdb813] text-xs" /> Message
                 </button>
                 <button onClick={() => setShowShare(true)}
@@ -860,9 +946,9 @@ export default function StudentProfileView() {
               <div className="grid grid-cols-2 gap-3 mb-3">
                 {[
                   { label: 'Course',     value: student.course || 'N/A',    icon: 'fa-book'          },
-                  { label: 'Year Level', value: student.year_level ? `${student.year_level}th Year` : '4th Year', icon: 'fa-layer-group' },
-                  { label: 'Status',     value: 'Enrolled',                 icon: 'fa-circle-check',  green: true },
-                  { label: 'Batch',      value: batchYear,                  icon: 'fa-calendar'      },
+                  { label: 'Year Level', value: yearLevelLabel(student),    icon: 'fa-layer-group'   },
+                  { label: 'Status',     value: academicStatusFor(student), icon: academicStatusFor(student) === 'Alumni' ? 'fa-graduation-cap' : 'fa-circle-check', green: true },
+                  { label: 'Batch',      value: batchYear || 'N/A',         icon: 'fa-calendar'      },
                 ].map(row => (
                   <div key={row.label} className="bg-slate-50 border border-slate-100 rounded-xl p-4">
                     <div className="flex items-center gap-1.5 mb-2">

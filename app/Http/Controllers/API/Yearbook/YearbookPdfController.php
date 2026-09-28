@@ -175,9 +175,7 @@ class YearbookPdfController extends Controller
         }
 
         if (PlatformSettings::bool('enable_premium_subscription')) {
-            $subscription = Subscription::where('user_id', $user->id)->latest()->first();
-
-            if (! $subscription?->isStandard()) {
+            if (! \App\Support\SubscriptionAccess::isStandard($user)) {
                 abort(402, 'A Standard or Premium subscription is required to download the yearbook PDF.');
             }
         }
@@ -221,9 +219,7 @@ class YearbookPdfController extends Controller
             return true;
         }
 
-        $subscription = Subscription::where('user_id', $user->id)->latest()->first();
-
-        return ! $subscription?->isPremium();
+        return ! \App\Support\SubscriptionAccess::isPremium($user);
     }
 
     public function flipbookData(Request $request, int $batchId)

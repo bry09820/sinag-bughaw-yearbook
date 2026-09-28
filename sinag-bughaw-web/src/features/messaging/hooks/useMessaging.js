@@ -211,6 +211,31 @@ export function useMessaging(recipientId = null) {
     });
   }, [recipientId, fetchThread]);
 
+  // HTTP polling fallback (keeps UI live when Echo/Pusher is unavailable)
+  useEffect(() => {
+    const pollMs = recipientId ? 4000 : 8000;
+    const timer = setInterval(() => {
+      fetchConversations();
+      fetchUnreadCount();
+      if (recipientId) {
+        messagesApi.thread(recipientId)
+          .then(({ data }) => {
+            const msgs = Array.isArray(data) ? data : (data?.data ?? []);
+            setThread((prev) => {
+              const prevIds = prev.map((m) => String(m.id)).join(',');
+              const nextIds = msgs.map((m) => String(m.id)).join(',');
+              if (prevIds === nextIds) return prev;
+              seenIdsRef.current = new Set(msgs.map((m) => m.id));
+              return msgs;
+            });
+          })
+          .catch(() => {});
+      }
+    }, pollMs);
+
+    return () => clearInterval(timer);
+  }, [recipientId, fetchConversations, fetchUnreadCount]);
+
   return {
     conversations,
     thread,

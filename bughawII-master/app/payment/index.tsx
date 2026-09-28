@@ -17,7 +17,7 @@ const PLANS: any = {
     monthly: { key: 'standard_monthly', price: 'PHP 99', period: 'month' },
     yearly: { key: 'standard_yearly', price: 'PHP 799', period: 'year', savings: 'Save 33%' },
     summary: 'Core access for browsing and connecting.',
-    features: ['Browse all student profiles', 'Access digital gallery', 'Direct messaging', 'Basic yearbook viewing', 'Yearbook PDF download', 'Section and faculty directory'],
+    features: ['Browse all student profiles', 'Access digital gallery', 'Basic yearbook viewing', 'Yearbook PDF download', 'Section and faculty directory'],
     accent: colors.indigo,
     soft: colors.softIndigo,
   },

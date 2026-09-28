@@ -251,12 +251,9 @@ class MediaController extends Controller
     public function storageUsage(): JsonResponse
     {
         $userId = Auth::id();
+        $user = Auth::user();
 
-        $subscription = \App\Models\Subscription::where('user_id', $userId)
-            ->where('status', 'active')
-            ->first();
-
-        $tier = $subscription?->tier ?? 'free';
+        $tier = \App\Support\SubscriptionAccess::tierFor($user);
 
         $limitBytes = match ($tier) {
             'premium'          => 50  * 1024 * 1024 * 1024,
@@ -293,9 +290,7 @@ class MediaController extends Controller
 
     private function requireSubscribed(): ?JsonResponse
     {
-        $sub = Subscription::where('user_id', Auth::id())->latest()->first();
-
-        if (! $sub?->isStandard()) {
+        if (! \App\Support\SubscriptionAccess::isStandard(Auth::user())) {
             return $this->error(
                 message: 'Gallery uploads require a Standard or Premium subscription.',
                 errors: ['code' => 'UPGRADE_REQUIRED'],

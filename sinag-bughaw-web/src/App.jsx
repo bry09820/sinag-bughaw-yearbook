@@ -40,6 +40,8 @@ import DiscoveryStudentProfile from '@/features/batch/pages/DiscoveryStudentProf
 // Messaging
 import MessagesPage   from '@/features/messaging/pages/MessagesPage';
 import VoiceNotesPage from '@/features/messaging/pages/VoiceNotesPage';
+import { ChatHeadsProvider } from '@/features/messaging/context/ChatHeadsContext';
+import GlobalChatHeads from '@/features/messaging/components/GlobalChatHeads';
 
 // Subscription / Payment
 import PaymentPage        from '@/features/subscription/pages/PaymentPage';
@@ -128,6 +130,7 @@ export default function App() {
     <AppConfigProvider>
       <AuthProvider>
         <BrowserRouter>
+          <ChatHeadsProvider>
           <Routes>
             <Route path="/maintenance" element={<MaintenancePage />} />
 
@@ -269,7 +272,9 @@ export default function App() {
 
             </Route>
           </Routes>
+          <GlobalChatHeads />
           <PrivacyScreen />
+          </ChatHeadsProvider>
         </BrowserRouter>
       </AuthProvider>
     </AppConfigProvider>

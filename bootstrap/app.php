@@ -21,6 +21,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // CORS first — before everything including auth 
         $middleware->prepend(HandleCors::class);
 
+        // Hostinger / CDN / reverse proxies — trust X-Forwarded-* so HTTPS & client IP work
+        $middleware->trustProxies(at: '*');
+
         $middleware->statefulApi();
 
         // Override the login redirect so API routes never hit route('login')

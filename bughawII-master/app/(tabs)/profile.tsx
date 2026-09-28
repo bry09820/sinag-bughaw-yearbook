@@ -95,11 +95,21 @@ const isGraduate = (user: any) => {
   const year = Number(graduationYear(user));
   return Number.isFinite(year) && year <= new Date().getFullYear();
 };
-const isPremium = (user: any) => Boolean(user?.is_premium || user?.is_subscribed || user?.tier === 'premium' || user?.tier === 'standard');
+const isPremium = (user: any) => Boolean(
+  user?.is_premium ||
+  user?.is_subscribed ||
+  user?.is_standard ||
+  ['premium', 'standard', 'admin', 'super_admin'].includes(String(user?.role || '').toLowerCase()) ||
+  user?.tier === 'premium' ||
+  user?.tier === 'standard' ||
+  user?.subscription_status === 'premium' ||
+  user?.subscription_status === 'standard'
+);
 const hasPaidAccess = isPremium;
 const subscriptionTier = (user: any) => {
-  if (user?.tier === 'premium' || user?.is_premium) return 'premium';
-  if (user?.tier === 'standard' || user?.is_subscribed) return 'standard';
+  if (user?.tier === 'premium' || user?.is_premium || String(user?.role || '').toLowerCase() === 'premium') return 'premium';
+  if (user?.tier === 'standard' || user?.is_subscribed || String(user?.role || '').toLowerCase() === 'standard') return 'standard';
+  if (['admin', 'super_admin'].includes(String(user?.role || '').toLowerCase())) return 'premium';
   return 'free';
 };
 const listFromPayload = (payload: any) => {

@@ -13,16 +13,19 @@ return [
     'ses' => [
         'key'    => env('AWS_ACCESS_KEY_ID'),
         'secret' => env('AWS_SECRET_ACCESS_KEY'),
-        'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
+        'region' => env('AWS_DEFAULT_REGION', env('AWS_REGION', 'ap-southeast-1')),
     ],
 
-    // AWS Rekognition 
+    // AWS Rekognition (Singapore region default — closest to PH / Hostinger)
     'rekognition' => [
         'key'        => env('AWS_ACCESS_KEY_ID'),
         'secret'     => env('AWS_SECRET_ACCESS_KEY'),
-        'region'     => env('AWS_DEFAULT_REGION', 'us-east-1'),
+        'region'     => env('AWS_DEFAULT_REGION', env('AWS_REGION', 'ap-southeast-1')),
         'collection' => env('AWS_REKOGNITION_COLLECTION', 'nu-lipa-yearbook'),
-        'threshold'  => (float) env('AWS_REKOGNITION_THRESHOLD', 90),
+        'threshold'  => (float) env(
+            'AWS_REKOGNITION_THRESHOLD',
+            env('FACE_RECOGNITION_THRESHOLD', 90)
+        ),
     ],
 
     'slack' => [

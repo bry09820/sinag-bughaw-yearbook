@@ -2,8 +2,8 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\Subscription;
 use App\Support\PlatformSettings;
+use App\Support\SubscriptionAccess;
 use Closure;
 use Illuminate\Http\Request;
 
@@ -20,19 +20,10 @@ class CheckSubscriptionAccess
         }
 
         $user = $request->user();
-        $isSubscribed = false;
-        $isPremium = false;
-        $tier = 'free';
+        $tier = SubscriptionAccess::tierFor($user);
 
-        if ($user) {
-            $sub = Subscription::where('user_id', $user->id)->latest()->first();
-            $isSubscribed = (bool) $sub?->isStandard();
-            $isPremium = (bool) $sub?->isPremium();
-            $tier = $sub?->isActive() ? ($sub->tier ?? 'free') : 'free';
-        }
-
-        $request->attributes->set('viewer_is_subscribed', $isSubscribed);
-        $request->attributes->set('viewer_is_premium', $isPremium);
+        $request->attributes->set('viewer_is_subscribed', SubscriptionAccess::isSubscribed($user));
+        $request->attributes->set('viewer_is_premium', SubscriptionAccess::isPremium($user));
         $request->attributes->set('viewer_tier', $tier);
 
         return $next($request);

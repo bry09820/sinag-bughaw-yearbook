@@ -71,6 +71,49 @@ class AwsRekognitionFaceRecognition implements FaceRecognition
         ];
     }
 
+    public function indexStudentFromBytes(User $user, string $bytes): array
+    {
+        if (! $this->isEnabled()) {
+            return ['indexed' => false, 'reason' => 'Face recognition is not configured.'];
+        }
+
+        if ($bytes === '') {
+            return ['indexed' => false, 'reason' => 'Empty face image payload.'];
+        }
+
+        $this->ensureCollectionExists();
+        $deletedFaces = $this->deleteExistingStudentFaces($user);
+
+        try {
+            $result = $this->client()->indexFaces([
+                'CollectionId'        => $this->collectionId(),
+                'ExternalImageId'     => $this->externalImageId($user),
+                'Image'               => ['Bytes' => $bytes],
+                'DetectionAttributes' => ['DEFAULT'],
+                'MaxFaces'            => 1,
+                'QualityFilter'       => 'AUTO',
+            ]);
+        } catch (AwsException $e) {
+            Log::error('[Rekognition] indexStudentFromBytes failed', [
+                'user_id' => $user->id,
+                'error'   => $e->getMessage(),
+            ]);
+
+            return [
+                'indexed' => false,
+                'reason'  => $e->getAwsErrorMessage() ?: $e->getMessage(),
+            ];
+        }
+
+        return [
+            'indexed'           => count($result['FaceRecords'] ?? []) > 0,
+            'face_records'      => count($result['FaceRecords'] ?? []),
+            'unindexed_faces'   => count($result['UnindexedFaces'] ?? []),
+            'external_image_id' => $this->externalImageId($user),
+            'deleted_faces'     => $deletedFaces,
+        ];
+    }
+
     // indexPhoto
     public function indexPhoto(string $imageUrl, string $externalImageId): array
     {
@@ -587,14 +630,16 @@ class AwsRekognitionFaceRecognition implements FaceRecognition
 
     private function fetchUrlBytes(string $url): ?string
     {
+        $verifySsl = ! app()->environment(['local', 'development']);
+
         $context = stream_context_create([
             'http' => [
                 'timeout'         => 10,
                 'follow_location' => true,
             ],
             'ssl' => [
-                'verify_peer'      => false,
-                'verify_peer_name' => false,
+                'verify_peer'      => $verifySsl,
+                'verify_peer_name' => $verifySsl,
             ],
         ]);
 

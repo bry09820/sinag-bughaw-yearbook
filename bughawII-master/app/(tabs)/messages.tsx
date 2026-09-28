@@ -6,7 +6,7 @@ import { FontAwesome } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { fetchCurrentUser, getConversations, getErrorMessage, getMessageParticipant, getMessageThread, getPresenceBulk, imageUrl, markMessageRead, sendMessage, sendTypingStatus, updatePresence, unwrap } from '../../lib/api';
+import { fetchCurrentUser, getConversations, getErrorMessage, getMessageParticipant, getMessageThread, getPresenceBulk, imageUrl, markMessageRead, searchMessageUsers, sendMessage, sendTypingStatus, startMessageConversation, updatePresence, unwrap } from '../../lib/api';
 
 const sameId = (left: any, right: any) => left !== undefined && left !== null && right !== undefined && right !== null && String(left) === String(right);
 const authUserId = (user: any) => user?.id || user?.user_id || user?.account_user_id || user?.data?.id || user?.user?.id;
@@ -74,6 +74,10 @@ export default function MessagesScreen() {
   const [selected, setSelected] = useState<any>(null);
   const [presence, setPresence] = useState<Record<string, any>>({});
   const [search, setSearch] = useState('');
+  const [findMode, setFindMode] = useState(false);
+  const [findQuery, setFindQuery] = useState('');
+  const [findResults, setFindResults] = useState<any[]>([]);
+  const [findLoading, setFindLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [selectedImage, setSelectedImage] = useState<any>(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
@@ -81,7 +85,9 @@ export default function MessagesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
+  const [peerTyping, setPeerTyping] = useState(false);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const findTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const selectedRef = useRef<any>(null);
 
   useEffect(() => {
@@ -93,6 +99,32 @@ export default function MessagesScreen() {
     if (!term) return conversations;
     return conversations.filter((item) => personName(item, authUserId(currentUser)).toLowerCase().includes(term));
   }, [conversations, currentUser, search]);
+
+  const runFindSearch = useCallback(async (query: string) => {
+    const q = query.trim();
+    if (!q) {
+      setFindResults([]);
+      return;
+    }
+    setFindLoading(true);
+    try {
+      const payload = await searchMessageUsers({ q, limit: 25 });
+      const data = unwrap(payload);
+      const rows = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
+      const me = authUserId(currentUser);
+      setFindResults(rows.filter((row: any) => !sameId(row?.id || row?.user_id, me)));
+    } catch {
+      setFindResults([]);
+    } finally {
+      setFindLoading(false);
+    }
+  }, [currentUser]);
+
+  const handleFindQueryChange = (text: string) => {
+    setFindQuery(text);
+    if (findTimer.current) clearTimeout(findTimer.current);
+    findTimer.current = setTimeout(() => runFindSearch(text), 300);
+  };
 
   const loadConversations = useCallback(async () => {
     try {
@@ -146,12 +178,15 @@ export default function MessagesScreen() {
     return () => {
       updatePresence(false).catch(() => {});
       if (typingTimer.current) clearTimeout(typingTimer.current);
+      if (findTimer.current) clearTimeout(findTimer.current);
     };
   }, []);
 
   const openThread = useCallback(async (conversation: any) => {
     setSelected(conversation);
     setThread([]);
+    setPeerTyping(false);
+    setFindMode(false);
     try {
       const id = personId(conversation, authUserId(currentUser));
       const payload = await getMessageThread(id);
@@ -164,6 +199,34 @@ export default function MessagesScreen() {
       Alert.alert('Thread unavailable', getErrorMessage(requestError, 'Unable to load this message thread.'));
     }
   }, [currentUser]);
+
+  const startChatWithUser = useCallback(async (person: any) => {
+    const userId = person?.user_id || person?.account_user_id || person?.id;
+    if (!userId) {
+      Alert.alert('Unavailable', 'This student is not linked to a messaging account.');
+      return;
+    }
+
+    try {
+      await startMessageConversation(userId).catch(() => null);
+      const payload = await getMessageParticipant(userId).catch(() => person);
+      const participant = unwrap(payload) || person;
+      const bootstrap = {
+        other_user: {
+          id: participant?.id || userId,
+          name: participant?.name || person?.name || 'Student',
+          profile_picture: participant?.profile_picture || person?.profile_picture,
+          course: participant?.course || person?.course,
+        },
+      };
+      setFindMode(false);
+      setFindQuery('');
+      setFindResults([]);
+      await openThread(bootstrap);
+    } catch (requestError: any) {
+      Alert.alert('Chat unavailable', getErrorMessage(requestError, 'Unable to open this conversation.'));
+    }
+  }, [openThread]);
 
   const refreshThreadQuietly = useCallback(async () => {
     const conversation = selectedRef.current;
@@ -192,27 +255,45 @@ export default function MessagesScreen() {
       updatePresence(true).catch(() => {});
       refreshConversationsQuietly();
       refreshThreadQuietly();
-    }, selected ? 4500 : 9000);
+    }, selected ? 3500 : 8000);
 
     return () => clearInterval(timer);
   }, [refreshConversationsQuietly, refreshThreadQuietly, selected]);
 
   useEffect(() => {
     if (!directUserId) return;
-    const bootstrap = {
-      other_user: {
-        id: Number(directUserId),
-        name: directName || 'Student',
-      },
-    };
-    setSelected(bootstrap);
-    getMessageParticipant(directUserId)
-      .then((payload) => {
+    let cancelled = false;
+
+    (async () => {
+      const bootstrap = {
+        other_user: {
+          id: Number(directUserId),
+          name: directName || 'Student',
+        },
+      };
+      if (!cancelled) setSelected(bootstrap);
+
+      try {
+        await startMessageConversation(directUserId).catch(() => null);
+        const payload = await getMessageParticipant(directUserId);
         const participant = unwrap(payload);
-        setSelected({ other_user: { ...participant, id: participant?.id || Number(directUserId), name: participant?.name || directName || 'Student' } });
-      })
-      .catch(() => {});
-    openThread(bootstrap);
+        if (!cancelled) {
+          setSelected({
+            other_user: {
+              ...participant,
+              id: participant?.id || Number(directUserId),
+              name: participant?.name || directName || 'Student',
+            },
+          });
+        }
+      } catch {
+        // Keep bootstrap identity if participant lookup fails.
+      }
+
+      if (!cancelled) await openThread(bootstrap);
+    })();
+
+    return () => { cancelled = true; };
   }, [directName, directUserId, openThread]);
 
   const handleMessageChange = (text: string) => {
@@ -290,66 +371,121 @@ export default function MessagesScreen() {
           <Text style={styles.headerTitle}>Messages</Text>
           <Text style={styles.headerText}>{conversations.length} conversation{conversations.length === 1 ? '' : 's'}</Text>
         </View>
-        <TouchableOpacity style={styles.topIconButton} onPress={() => router.push('/directory' as any)} activeOpacity={0.86}>
-          <FontAwesome name="edit" size={17} color="#fdb813" />
+        <TouchableOpacity
+          style={styles.topIconButton}
+          onPress={() => {
+            setFindMode((value) => !value);
+            setFindQuery('');
+            setFindResults([]);
+            setSearch('');
+          }}
+          activeOpacity={0.86}
+        >
+          <FontAwesome name={findMode ? 'times' : 'edit'} size={17} color="#fdb813" />
         </TouchableOpacity>
       </View>
 
       <FlatList
-        data={filteredConversations}
-        keyExtractor={(item, index) => String(personId(item, authUserId(currentUser)) || index)}
+        data={findMode ? findResults : filteredConversations}
+        keyExtractor={(item, index) => String((findMode ? (item?.user_id || item?.id) : personId(item, authUserId(currentUser))) || index)}
         ListHeaderComponent={(
           <>
             <View style={styles.searchContainer}>
               <FontAwesome name="search" size={15} color="#8e8e93" />
-              <TextInput style={styles.searchInput} placeholder="Search" placeholderTextColor="#8e8e93" value={search} onChangeText={setSearch} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder={findMode ? 'Search by name, course, or batch...' : 'Search conversations'}
+                placeholderTextColor="#8e8e93"
+                value={findMode ? findQuery : search}
+                onChangeText={findMode ? handleFindQueryChange : setSearch}
+                autoFocus={findMode}
+              />
+              {findMode && findLoading ? <ActivityIndicator size="small" color="#1d2b4b" /> : null}
             </View>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Messages</Text>
-              <TouchableOpacity onPress={() => router.push('/directory' as any)}>
-                <Text style={styles.requestLink}>New</Text>
+              <Text style={styles.sectionTitle}>{findMode ? 'Find Students' : 'Messages'}</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setFindMode((value) => !value);
+                  setFindQuery('');
+                  setFindResults([]);
+                }}
+              >
+                <Text style={styles.requestLink}>{findMode ? 'Done' : 'New'}</Text>
               </TouchableOpacity>
             </View>
           </>
         )}
         renderItem={({ item }) => (
-          <TouchableOpacity style={styles.card} onPress={() => openThread(item)} activeOpacity={0.75}>
-            <View style={styles.avatarWrap}>
-              {personPhoto(item, authUserId(currentUser)) ? <Image source={personPhoto(item, authUserId(currentUser))} style={styles.avatar} /> : <View style={styles.avatarFallback}><Text style={styles.avatarText}>{initials(personName(item, authUserId(currentUser)))}</Text></View>}
-              <View style={[styles.onlineDot, presence[String(personId(item, authUserId(currentUser)))]?.is_online && styles.onlineDotActive]} />
-            </View>
-            <View style={styles.info}>
-              <View style={styles.nameRow}>
-                <Text style={styles.name}>{personName(item, authUserId(currentUser))}</Text>
-                {!!item?.unread_count && <View style={styles.unreadBadge}><Text style={styles.unreadText}>{item.unread_count}</Text></View>}
+          findMode ? (
+            <TouchableOpacity style={styles.card} onPress={() => startChatWithUser(item)} activeOpacity={0.75}>
+              <View style={styles.avatarWrap}>
+                {imageUrl(item?.profile_picture) ? (
+                  <Image source={imageUrl(item.profile_picture)} style={styles.avatar} />
+                ) : (
+                  <View style={styles.avatarFallback}><Text style={styles.avatarText}>{initials(item?.name)}</Text></View>
+                )}
               </View>
-              <Text style={styles.preview} numberOfLines={1}>{item?.last_message?.body || item?.latest_message?.body || item?.body || item?.message || (messageImage(item) ? 'Sent an image' : 'Open conversation')}</Text>
-            </View>
-            <View style={styles.trailing}>
-              <Text style={styles.timeText}>{formatTime(item?.last_message?.created_at || item?.latest_message?.created_at || item?.created_at)}</Text>
-              <FontAwesome name="chevron-right" size={12} color="#d1d5db" />
-            </View>
-          </TouchableOpacity>
-        )}
-        ListEmptyComponent={loading ? <ActivityIndicator color="#1d2b4b" style={{ marginTop: 26 }} /> : (
-          <View style={styles.emptyPanel}>
-            <FontAwesome name="comments-o" size={42} color="#dbe3ef" />
-            <Text style={styles.emptyTitle}>{error || 'No conversations yet'}</Text>
-            <TouchableOpacity style={styles.findButton} onPress={() => router.push('/directory' as any)}>
-              <FontAwesome name="search" size={13} color="#fdb813" />
-              <Text style={styles.findButtonText}>Find Students</Text>
+              <View style={styles.info}>
+                <Text style={styles.name}>{item?.name || 'Student'}</Text>
+                <Text style={styles.preview} numberOfLines={1}>
+                  {[item?.course, item?.batch_year || item?.graduation_year].filter(Boolean).join(' · ') || 'Tap to message'}
+                </Text>
+              </View>
+              <FontAwesome name="comment" size={16} color="#fdb813" />
             </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={styles.card} onPress={() => openThread(item)} activeOpacity={0.75}>
+              <View style={styles.avatarWrap}>
+                {personPhoto(item, authUserId(currentUser)) ? <Image source={personPhoto(item, authUserId(currentUser))} style={styles.avatar} /> : <View style={styles.avatarFallback}><Text style={styles.avatarText}>{initials(personName(item, authUserId(currentUser)))}</Text></View>}
+                <View style={[styles.onlineDot, presence[String(personId(item, authUserId(currentUser)))]?.is_online && styles.onlineDotActive]} />
+              </View>
+              <View style={styles.info}>
+                <View style={styles.nameRow}>
+                  <Text style={styles.name}>{personName(item, authUserId(currentUser))}</Text>
+                  {!!item?.unread_count && <View style={styles.unreadBadge}><Text style={styles.unreadText}>{item.unread_count}</Text></View>}
+                </View>
+                <Text style={styles.preview} numberOfLines={1}>{item?.last_message?.body || item?.latest_message?.body || item?.body || item?.message || (messageImage(item) ? 'Sent an image' : 'Open conversation')}</Text>
+              </View>
+              <View style={styles.trailing}>
+                <Text style={styles.timeText}>{formatTime(item?.last_message?.created_at || item?.latest_message?.created_at || item?.created_at)}</Text>
+                <FontAwesome name="chevron-right" size={12} color="#d1d5db" />
+              </View>
+            </TouchableOpacity>
+          )
+        )}
+        ListEmptyComponent={loading || findLoading ? <ActivityIndicator color="#1d2b4b" style={{ marginTop: 26 }} /> : (
+          <View style={styles.emptyPanel}>
+            <FontAwesome name={findMode ? 'search' : 'comments-o'} size={42} color="#dbe3ef" />
+            <Text style={styles.emptyTitle}>
+              {error || (findMode
+                ? (findQuery.trim() ? `No students matched “${findQuery.trim()}”` : 'Search by name, course, or batch year')
+                : 'No conversations yet')}
+            </Text>
+            {!findMode ? (
+              <TouchableOpacity
+                style={styles.findButton}
+                onPress={() => {
+                  setFindMode(true);
+                  setFindQuery('');
+                  setFindResults([]);
+                }}
+              >
+                <FontAwesome name="search" size={13} color="#fdb813" />
+                <Text style={styles.findButtonText}>Find Students</Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
         )}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadConversations(); }} />}
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 96 }]}
       />
 
-      <Modal visible={!!selected} animationType="slide" onRequestClose={() => setSelected(null)}>
+      <Modal visible={!!selected} animationType="slide" onRequestClose={() => { setSelected(null); setPeerTyping(false); }}>
         <SafeAreaView style={styles.threadScreen} edges={['top', 'left', 'right']}>
           <KeyboardAvoidingView style={styles.keyboardWrap} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={styles.threadHeader}>
-            <TouchableOpacity style={styles.threadBackButton} onPress={() => setSelected(null)} activeOpacity={0.86}>
+            <TouchableOpacity style={styles.threadBackButton} onPress={() => { setSelected(null); setPeerTyping(false); }} activeOpacity={0.86}>
               <FontAwesome name="chevron-left" size={18} color="#111827" />
             </TouchableOpacity>
             <View style={styles.threadAvatarWrap}>
@@ -359,7 +495,9 @@ export default function MessagesScreen() {
             <View style={styles.threadTitleWrap}>
               <Text style={styles.threadTitle} numberOfLines={1}>{personName(selected, authUserId(currentUser))}</Text>
               <Text style={styles.threadMeta} numberOfLines={1}>
-                {presence[String(personId(selected, authUserId(currentUser)))]?.is_online ? 'Active now' : personCourse(selected, authUserId(currentUser))}
+                {peerTyping
+                  ? 'Typing…'
+                  : (presence[String(personId(selected, authUserId(currentUser)))]?.is_online ? 'Active now' : personCourse(selected, authUserId(currentUser)))}
               </Text>
             </View>
             <TouchableOpacity style={styles.refreshThreadButton} onPress={refreshThreadQuietly}>
@@ -380,7 +518,13 @@ export default function MessagesScreen() {
               </View>
             )}
             contentContainerStyle={styles.threadContent}
-            ListEmptyComponent={<Text style={styles.emptyText}>No messages in this thread.</Text>}
+            ListEmptyComponent={(
+              <View style={styles.emptyPanel}>
+                <FontAwesome name="comment-o" size={36} color="#dbe3ef" />
+                <Text style={styles.emptyTitle}>Say hello</Text>
+                <Text style={styles.emptyText}>No messages yet. Send the first one below.</Text>
+              </View>
+            )}
           />
           <View style={[styles.composer, { paddingBottom: insets.bottom + 10 }]}>
             {emojiOpen ? (

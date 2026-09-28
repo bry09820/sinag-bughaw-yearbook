@@ -2,8 +2,8 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\Subscription;
 use App\Support\PlatformSettings;
+use App\Support\SubscriptionAccess;
 use Closure;
 use Illuminate\Http\Request;
 
@@ -21,14 +21,12 @@ class CheckStandard
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }
 
-        $sub = Subscription::where('user_id', $user->id)->latest()->first();
-
-        if (! $sub || ! $sub->isStandard()) {
+        if (! SubscriptionAccess::isStandard($user)) {
             return response()->json([
-                'message'     => 'A subscription is required to access this feature.',
-                'upgrade_url' => '/premium',
-                'subscription_status' => 'free',
-                'required_tier' => 'standard',
+                'message'             => 'A subscription is required to access this feature.',
+                'upgrade_url'         => '/premium',
+                'subscription_status' => SubscriptionAccess::tierFor($user),
+                'required_tier'       => 'standard',
             ], 402);
         }
 

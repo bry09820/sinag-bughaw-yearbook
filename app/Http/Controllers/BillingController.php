@@ -35,7 +35,7 @@ class BillingController extends Controller
                 return response()->json(['message' => 'Unauthenticated.'], 401);
             }
 
-            $frontend = rtrim((string) env('FRONTEND_URL', 'http://localhost:5173'), '/');
+            $frontend = rtrim((string) config('app.frontend_url'), '/');
             return redirect()->away($frontend . '/login?redirect=/premium');
         }
 
@@ -104,7 +104,7 @@ class BillingController extends Controller
             return response()->json(array_merge(['message' => $message], $extra), $status);
         }
 
-        $frontend = rtrim((string) env('FRONTEND_URL', 'http://localhost:5173'), '/');
+        $frontend = rtrim((string) config('app.frontend_url'), '/');
         return redirect()->away($frontend . '/premium?checkout_error=' . urlencode($message));
     }
 }

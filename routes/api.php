@@ -31,6 +31,7 @@ use App\Http\Controllers\API\Search\SearchController;
 use App\Http\Controllers\API\Section\SectionController;
 use App\Http\Controllers\API\Section\DiscoveryStudentController;
 use App\Http\Controllers\API\Social\MessageController;
+use App\Http\Controllers\API\Social\ChatController;
 use App\Http\Controllers\API\Social\NotificationController;
 use App\Http\Controllers\API\Student\ProfileSettingsController;
 use App\Http\Controllers\API\Student\ProfileController;
@@ -49,6 +50,9 @@ use App\Http\Controllers\BillingController;
 use Illuminate\Support\Facades\Route;
 
 // PUBLIC ROUTES
+
+// Face login — POST only (public, outside auth:sanctum). Do not register as GET.
+Route::post('/auth/face-login', [AuthController::class, 'faceLogin']);
 
 Route::get('/app-config', [AppConfigController::class, 'show']);
 
@@ -201,11 +205,20 @@ Route::middleware(['auth:sanctum', 'active.account', 'verified', 'throttle:120,1
     Route::prefix('messages')->group(function () {
         Route::get('/conversations', [MessageController::class, 'conversations']);
         Route::get('/unread-count',  [MessageController::class, 'unreadCount']);
+        Route::get('/search',        [MessageController::class, 'searchUsers']);
+        Route::post('/start',        [MessageController::class, 'start']);
         Route::get('/users/{userId}', [MessageController::class, 'participant']);
         Route::post('/typing',       [MessageController::class, 'typing']);
         Route::post('/',             [MessageController::class, 'send']);
         Route::get('/{userId}',      [MessageController::class, 'thread']);
         Route::patch('/{id}/read',   [MessageController::class, 'markRead']);
+    });
+
+    // Chat (Expo mobile aliases — no subscription gate)
+    Route::prefix('chat')->group(function () {
+        Route::get('/conversations', [ChatController::class, 'conversations']);
+        Route::get('/with/{userId}', [ChatController::class, 'withUser'])->whereNumber('userId');
+        Route::post('/messages',     [ChatController::class, 'send']);
     });
 
     // Presence 
@@ -379,9 +392,8 @@ Route::middleware(['auth:sanctum', 'active.account', 'verified', 'throttle:120,1
     // STANDARD/PREMIUM YEARBOOK PDF DOWNLOADS
     Route::middleware('standard')->group(function () {
 
-        // Bumped from throttle:5,1 throttle:60,1 for development
         Route::get('/yearbook/export/pdf/{batchId}', [YearbookPdfController::class, 'export'])
-            ->middleware(['throttle:60,1', 'content.security', 'feature:enable_yearbook_pdf_download'])
+            ->middleware(['throttle:10,1', 'content.security', 'feature:enable_yearbook_pdf_download'])
             ->name('yearbook.export.pdf');
 
         Route::get('yearbooks/{batch}/download', [YearbookController::class, 'download'])

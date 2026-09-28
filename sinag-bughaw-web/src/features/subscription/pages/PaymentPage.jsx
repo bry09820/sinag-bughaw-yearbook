@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { paymentsApi } from '@/api/payment.api';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 
 const TIERS = {
   standard: {
@@ -12,7 +13,6 @@ const TIERS = {
     features: [
       'Browse all student profiles',
       'Access digital gallery',
-      'Direct messaging',
       'Basic yearbook viewing',
       'Yearbook PDF download',
       'Section & faculty directory',
@@ -43,6 +43,7 @@ const TIERS = {
 };
 
 export default function PaymentPage() {
+  const { fetchUser } = useAuth();
   const [activeTier, setTier] = useState('standard');
   const [plan,       setPlan] = useState('standard_monthly');
   const [status,  setStatus]  = useState(null);
@@ -52,7 +53,7 @@ export default function PaymentPage() {
 
   useEffect(() => {
     paymentsApi.subscriptionStatus()
-      .then(({ data }) => {
+      .then(async ({ data }) => {
         setStatus(data);
         if (data?.is_premium) {
           setTier('premium');
@@ -61,9 +62,10 @@ export default function PaymentPage() {
           setTier('standard');
           setPlan('standard_monthly');
         }
+        try { await fetchUser(); } catch { /* keep payment status even if /me fails */ }
       })
       .finally(()      => setLoading(false));
-  }, []);
+  }, [fetchUser]);
 
   // When tier changes, auto-select the monthly plan for that tier
   const handleTierChange = (tier) => {

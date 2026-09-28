@@ -51,7 +51,7 @@ class StudentController extends Controller
 
         return Cache::remember($key, 300, function () use ($request, $viewer) {
             return User::with(['section', 'studentRecord'])
-                ->where('role', 'student')
+                ->whereIn('role', ['student', 'alumni'])
                 ->when(! $viewer, fn($q) =>
                     $q->where('profile_visibility', 'public')
                 )
@@ -138,9 +138,11 @@ class StudentController extends Controller
                     'visibility' => 'unregistered',
                     'student' => [
                         'id' => $studentRecord->id,
+                        'user_id' => null,
                         'name' => trim(($studentRecord->first_name ?? '') . ' ' . ($studentRecord->last_name ?? '')),
                         'profile_picture' => $studentRecord->photo,
                         'course' => $studentRecord->course,
+                        'graduation_year' => $studentRecord->graduation_year,
                     ],
                 ], 200);
             }

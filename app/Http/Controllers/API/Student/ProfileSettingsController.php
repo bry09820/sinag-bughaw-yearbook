@@ -37,9 +37,19 @@ class ProfileSettingsController extends Controller
 
         $user = $request->user();
         $user->update(['profile_visibility' => $request->visibility]);
+        $user->refresh();
         $this->notifyProfileUpdate($user, 'Your profile visibility was updated successfully.');
 
-        return response()->json(['message' => 'Visibility updated.']);
+        return response()->json([
+            'message' => 'Visibility updated.',
+            'visibility' => $user->profile_visibility,
+            'profile_visibility' => $user->profile_visibility,
+            'user' => [
+                'id' => $user->id,
+                'profile_visibility' => $user->profile_visibility,
+                'visibility' => $user->profile_visibility,
+            ],
+        ]);
     }
 
     // Update motto 

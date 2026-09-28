@@ -33,7 +33,7 @@ class PayMongoService
         ?string $successUrl = null,
         ?string $cancelUrl = null
     ): array {
-        $frontendUrl = rtrim((string) env('FRONTEND_URL', 'http://localhost:5173'), '/');
+        $frontendUrl = rtrim((string) config('app.frontend_url'), '/');
 
         $payload = [
             'data' => [

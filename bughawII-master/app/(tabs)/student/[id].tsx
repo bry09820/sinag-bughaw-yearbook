@@ -7,7 +7,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { createAudioPlayer, RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync, useAudioRecorder, useAudioRecorderState } from 'expo-audio';
-import { fetchCurrentUser, getAppConfig, getDiscoveryStudent, getErrorMessage, getFaceStudentPhotos, getStudent, getStudentAchievements, getStudentPosts, getVoiceNotesForProfile, imageUrl, sendVoiceNote, trackStudentView, unwrap } from '../../../lib/api';
+import { fetchCurrentUser, getAppConfig, getDiscoveryStudent, getErrorMessage, getFaceStudentPhotos, getMessageParticipant, getStudent, getStudentAchievements, getStudentPosts, getVoiceNotesForProfile, imageUrl, sendVoiceNote, trackStudentView, unwrap } from '../../../lib/api';
 
 const DISCOVERY_TABS = [
   { key: 'profile', label: 'Profile', icon: 'user-o' },
@@ -272,12 +272,31 @@ export default function StudentProfileScreen() {
     { label: 'Voice', value: voiceNotes.length },
   ], [achievements.length, posts.length, voiceNotes.length]);
 
-  const messageStudent = () => {
-    if (!userId) {
+  const messageStudent = async () => {
+    const recipientId =
+      userId ||
+      profileUserId(student, null, false) ||
+      explicitUserId;
+
+    if (!recipientId) {
       Alert.alert('Message unavailable', 'This student record is not linked to a user account yet.');
       return;
     }
-    router.push({ pathname: '/messages', params: { userId: String(userId), name } } as any);
+
+    try {
+      const payload = await getMessageParticipant(recipientId);
+      const participant = unwrap(payload);
+      const resolvedId = participant?.id || participant?.user_id || recipientId;
+      router.push({
+        pathname: '/messages',
+        params: {
+          userId: String(resolvedId),
+          name: participant?.name || name,
+        },
+      } as any);
+    } catch {
+      router.push({ pathname: '/messages', params: { userId: String(recipientId), name } } as any);
+    }
   };
 
   const toggleVoice = (note: any) => {
@@ -446,8 +465,15 @@ export default function StudentProfileScreen() {
               ))}
             </View>
 
+            <View style={styles.actionRow}>
+              <TouchableOpacity style={styles.primaryButton} onPress={messageStudent}>
+                <FontAwesome name="paper-plane" size={13} color="#fdb813" />
+                <Text style={styles.primaryButtonText}>Message</Text>
+              </TouchableOpacity>
+            </View>
+
             {discoveryLocked ? (
-              <LockedPanel title="Full profile locked" text="Upgrade to Standard or Premium to view student information, yearbook details, tagged photos, and messages." onPress={() => router.push('/payment' as any)} />
+              <LockedPanel title="Full profile locked" text="Upgrade to Standard or Premium to view student information, yearbook details, and tagged photos." onPress={() => router.push('/payment' as any)} />
             ) : (
               <Text style={[styles.discoveryMotto, !motto && styles.discoveryMottoEmpty]}>
                 {`"${motto || 'No motto added yet.'}"`}
@@ -692,7 +718,7 @@ export default function StudentProfileScreen() {
 
     if (tab === 'messages') {
       if (discoveryLocked) {
-        return <LockedPanel title="Messages locked" text="Upgrade to Standard or Premium to view and send student messages." onPress={() => router.push('/payment' as any)} />;
+        return <LockedPanel title="Yearbook messages locked" text="Upgrade to Standard or Premium to view yearbook dedications to batchmates and parents. Direct messaging is available to all registered students." onPress={() => router.push('/payment' as any)} />;
       }
 
       return (

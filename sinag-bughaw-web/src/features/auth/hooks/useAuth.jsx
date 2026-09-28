@@ -34,6 +34,42 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  // Keep auth/tier in sync across tabs and when returning to the app.
+  useEffect(() => {
+    const token = localStorage.getItem('sb_token');
+    if (!token) return undefined;
+
+    const refresh = () => {
+      authApi.me()
+        .then(({ data }) => {
+          if (!isVerifiedUser(data)) {
+            localStorage.removeItem('sb_token');
+            setUser(null);
+            return;
+          }
+          setUser(data);
+        })
+        .catch(() => {});
+    };
+
+    const onFocus = () => refresh();
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') refresh();
+    };
+    const onStorage = (e) => {
+      if (e.key === 'sb_token') refresh();
+    };
+
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, []);
+
   // Validates credentials only — does NOT store a token.
   // Access token is issued after OTP verification.
   const loginCredentials = async (email, password) => {

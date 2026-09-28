@@ -177,7 +177,9 @@ export default function PostLightbox({ post, initialIdx = 0, onClose }) {
               />
               <div>
                 <p className="text-sm font-bold text-[#1d2b4b] m-0 leading-none">{poster?.name ?? 'Pioneer Student'}</p>
-                <p className="text-[11px] text-slate-400 m-0 mt-1">NU Lipa · 2026</p>
+                <p className="text-[11px] text-slate-400 m-0 mt-1">
+                  NU Lipa{poster?.graduation_year || poster?.batch ? ` · ${poster.graduation_year || poster.batch}` : ''}
+                </p>
               </div>
             </div>
 

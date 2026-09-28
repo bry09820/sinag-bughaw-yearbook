@@ -27,8 +27,10 @@ class MessageController extends Controller
         $seen   = [];
 
         $conversations = Message::query()
-            ->where('sender_id', $userId)
-            ->orWhere('receiver_id', $userId)
+            ->where(function ($q) use ($userId) {
+                $q->where('sender_id', $userId)
+                    ->orWhere('receiver_id', $userId);
+            })
             ->with([
                 'sender:id,name,first_name,last_name,profile_picture,student_record_id',
                 'sender.studentRecord:id,course,photo',
@@ -87,6 +89,107 @@ class MessageController extends Controller
         return response()->json(['unread_count' => $count]);
     }
 
+    /**
+     * Search students/alumni to start a conversation (by name, course, or batch year).
+     * GET /api/messages/search?q=&batch_year=
+     */
+    public function searchUsers(Request $request): JsonResponse
+    {
+        $q = trim((string) $request->get('q', ''));
+        $batchYear = $request->get('batch_year');
+        $limit = min(max((int) $request->get('limit', 20), 1), 50);
+        $myId = (int) $request->user()->id;
+
+        if ($q === '' && blank($batchYear)) {
+            return response()->json(['data' => []]);
+        }
+
+        // Allow typing a graduation year in the free-text box (e.g. "2026").
+        if (blank($batchYear) && preg_match('/^\d{4}$/', $q)) {
+            $batchYear = $q;
+        }
+
+        $users = User::query()
+            ->with('studentRecord:id,course,graduation_year,photo,student_no')
+            ->where('id', '!=', $myId)
+            ->whereIn('role', ['student', 'alumni'])
+            ->when($q !== '' && ! preg_match('/^\d{4}$/', $q), function ($query) use ($q) {
+                $query->where(function ($sub) use ($q) {
+                    $sub->where('name', 'like', "%{$q}%")
+                        ->orWhere('first_name', 'like', "%{$q}%")
+                        ->orWhere('last_name', 'like', "%{$q}%")
+                        ->orWhere('email', 'like', "%{$q}%")
+                        ->orWhere('course', 'like', "%{$q}%")
+                        ->orWhere('student_id', 'like', "%{$q}%")
+                        ->orWhereHas('studentRecord', function ($student) use ($q) {
+                            $student->where('first_name', 'like', "%{$q}%")
+                                ->orWhere('last_name', 'like', "%{$q}%")
+                                ->orWhere('student_no', 'like', "%{$q}%")
+                                ->orWhere('course', 'like', "%{$q}%");
+                        });
+                });
+            })
+            ->when(filled($batchYear), function ($query) use ($batchYear) {
+                $year = (int) $batchYear;
+                $query->where(function ($sub) use ($year) {
+                    $sub->where('graduation_year', $year)
+                        ->orWhereHas('studentRecord', fn ($s) => $s->where('graduation_year', $year));
+                });
+            })
+            ->orderBy('name')
+            ->limit($limit)
+            ->get();
+
+        return response()->json([
+            'data' => $users->map(fn (User $user) => [
+                'id'              => $user->id,
+                'user_id'         => $user->id,
+                'account_user_id' => $user->id,
+                'name'            => $this->displayName($user),
+                'profile_picture' => $user->profile_picture ?: $user->studentRecord?->photo,
+                'course'          => $user->studentRecord?->course ?? $user->course,
+                'batch_year'      => $user->studentRecord?->graduation_year ?? $user->graduation_year,
+                'graduation_year' => $user->studentRecord?->graduation_year ?? $user->graduation_year,
+                'student_id'      => $user->student_id ?? $user->studentRecord?->student_no,
+            ])->values(),
+        ]);
+    }
+
+    /**
+     * Resolve / open a conversation peer (no message created until first send).
+     * POST /api/messages/start  { user_id }
+     */
+    public function start(Request $request): JsonResponse
+    {
+        $request->validate([
+            'user_id' => 'required|integer|exists:users,id',
+        ]);
+
+        if ((int) $request->input('user_id') === (int) $request->user()->id) {
+            return response()->json(['message' => 'You cannot message yourself.'], 422);
+        }
+
+        $user = $this->resolveParticipant($request, (int) $request->input('user_id'));
+
+        if ((int) $user->id === (int) $request->user()->id) {
+            return response()->json(['message' => 'You cannot message yourself.'], 422);
+        }
+
+        $hasThread = Message::thread($request->user()->id, $user->id)->exists();
+
+        return response()->json([
+            'user' => [
+                'id'              => $user->id,
+                'user_id'         => $user->id,
+                'name'            => $this->displayName($user),
+                'profile_picture' => $user->profile_picture,
+                'course'          => $user->studentRecord?->course ?? $user->course,
+                'batch_year'      => $user->studentRecord?->graduation_year ?? $user->graduation_year,
+            ],
+            'has_existing_thread' => $hasThread,
+        ]);
+    }
+
     // Thread 
 
     public function participant(Request $request, int $userId): JsonResponse
@@ -95,9 +198,11 @@ class MessageController extends Controller
 
         return response()->json([
             'id' => $user->id,
+            'user_id' => $user->id,
             'name' => $this->displayName($user),
             'profile_picture' => $user->profile_picture,
-            'course' => $user->course,
+            'course' => $user->studentRecord?->course ?? $user->course,
+            'batch_year' => $user->studentRecord?->graduation_year ?? $user->graduation_year,
         ]);
     }
 
@@ -127,6 +232,24 @@ class MessageController extends Controller
 
     public function send(Request $request): JsonResponse
     {
+        // Mobile / alternate clients may send recipient_id or message instead of receiver_id / body.
+        if (! $request->filled('receiver_id')) {
+            $receiver = $request->input('recipient_id')
+                ?? $request->input('user_id')
+                ?? $request->input('receiverId');
+            if ($receiver !== null && $receiver !== '') {
+                $request->merge(['receiver_id' => $receiver]);
+            }
+        }
+        if (! $request->filled('body')) {
+            $body = $request->input('message')
+                ?? $request->input('content')
+                ?? $request->input('text');
+            if ($body !== null && $body !== '') {
+                $request->merge(['body' => $body]);
+            }
+        }
+
         $request->validate([
             'receiver_id' => 'required|exists:users,id',
             'body'        => 'nullable|required_without:image|string|max:5000',
@@ -159,12 +282,17 @@ class MessageController extends Controller
             }
         }
         $body = trim((string) $request->input('body', ''));
+        if ($body === '' && ! $imagePath) {
+            return response()->json(['message' => 'Message body or image is required.'], 422);
+        }
+
         $preview = $body !== '' ? $body : 'Sent an image';
 
         $message = Message::create([
             'sender_id'   => $request->user()->id,
-            'receiver_id' => $request->receiver_id,
-            'body'        => $body,
+            'receiver_id' => (int) $request->receiver_id,
+            // Empty string for image-only (schema allows NOT NULL text).
+            'body'        => $body !== '' ? $body : '',
             'image_path'  => $imagePath,
         ]);
 

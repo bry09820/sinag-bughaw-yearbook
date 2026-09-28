@@ -4,7 +4,6 @@ namespace App\Http\Controllers\API\Section;
 
 use App\Http\Controllers\Controller;
 use App\Models\Student;
-use App\Models\Subscription;
 use App\Support\PlatformSettings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,11 +20,8 @@ class DiscoveryStudentController extends Controller
 
         $viewer = $request->user();
 
-        $isPremium = ! PlatformSettings::bool('enable_premium_subscription')
-            || ($viewer && Subscription::where('user_id', $viewer->id)
-                ->where('status', 'active')
-                ->where('tier', 'premium')
-                ->exists());
+        $isSubscribed = ! PlatformSettings::bool('enable_premium_subscription')
+            || \App\Support\SubscriptionAccess::isSubscribed($viewer);
 
         $data = [
             'id'                => $student->id,
@@ -39,10 +35,12 @@ class DiscoveryStudentController extends Controller
             'graduation_year'   => $student->graduation_year,
             'section'           => $student->section,
             'batch'             => $student->batch,
-            'is_premium_viewer' => $isPremium,
+            // Kept for BC; true for Standard and Premium paid viewers.
+            'is_premium_viewer' => $isSubscribed,
+            'is_subscribed_viewer' => $isSubscribed,
         ];
 
-        if ($isPremium) {
+        if ($isSubscribed) {
             $data = array_merge($data, [
                 'middle_name'           => $student->middle_name,
                 'nickname'              => $student->nickname,

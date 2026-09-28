@@ -12,7 +12,7 @@ return [
     
     'frontend_url' => env('FRONTEND_URL', 'http://localhost:5173'),
 
-    'timezone' => 'UTC',
+    'timezone' => env('APP_TIMEZONE', 'Asia/Manila'),
 
     'locale' => env('APP_LOCALE', 'en'),
 

@@ -20,10 +20,14 @@
     @elseif ($spaJs && $spaCss)
       <script type="module" crossorigin src="/assets/{{ basename($spaJs) }}"></script>
       <link rel="stylesheet" crossorigin href="/assets/{{ basename($spaCss) }}">
-    @else
+    @elseif (app()->environment(['local', 'development']))
       {{-- Dev fallback when Vite is running on 5173 without a hot file --}}
       <script type="module" src="http://localhost:5173/@vite/client"></script>
       <script type="module" src="http://localhost:5173/src/main.jsx"></script>
+    @else
+      <p style="font-family:system-ui;padding:2rem;text-align:center">
+        Application assets are missing. Run <code>npm run build</code> and deploy the <code>public/assets</code> folder.
+      </p>
     @endif
   </head>
   <body>

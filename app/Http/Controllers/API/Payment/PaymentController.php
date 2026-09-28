@@ -231,18 +231,18 @@ class PaymentController extends Controller
 
     public function subscriptionStatus(Request $request)
     {
-        $sub = Subscription::where('user_id', $request->user()->id)->latest()->first();
-        $active = $sub?->isActive() ? $sub : null;
+        $user = $request->user();
+        $payload = \App\Support\SubscriptionAccess::payload($user);
 
         return response()->json([
-            'is_active'            => (bool) $active,
-            'is_standard'          => $active?->isStandard() ?? false,
-            'is_premium'           => $active?->isPremium() ?? false,
-            'is_subscribed'        => (bool) $active,
-            'subscription_status'  => $active?->tier ?? 'free',
-            'tier'                 => $active?->tier ?? 'free',
-            'plan'                 => $active?->plan ?? null,
-            'expires_at'           => $active?->expires_at,
+            'is_active'           => $payload['is_subscribed'],
+            'is_standard'         => $payload['is_standard'],
+            'is_premium'          => $payload['is_premium'],
+            'is_subscribed'       => $payload['is_subscribed'],
+            'subscription_status' => $payload['subscription_status'],
+            'tier'                => $payload['tier'],
+            'plan'                => $payload['plan'],
+            'expires_at'          => $payload['expires_at'],
         ]);
     }
 

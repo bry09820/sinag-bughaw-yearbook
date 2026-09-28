@@ -9,6 +9,7 @@ import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
 import { imageUrl } from '@/utils/imageUrl';
+import { hasPaidAccess } from '@/utils/subscription';
 
 // Constants
 
@@ -845,7 +846,7 @@ function CrossProgramView({ isPremium }) {
 
 export default function DiscoveryPage() {
   const { user }                = useAuth();
-  const isPremium               = user?.is_premium === true || user?.tier === 'premium';
+  const isPremium               = hasPaidAccess(user);
   const [viewMode, setViewMode] = useState('batch');
   const activeMode              = VIEW_MODES.find(m => m.key === viewMode);
 

@@ -2,8 +2,8 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\Subscription;
 use App\Support\PlatformSettings;
+use App\Support\SubscriptionAccess;
 use Closure;
 use Illuminate\Http\Request;
 
@@ -21,14 +21,12 @@ class CheckPremium
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }
 
-        $sub = Subscription::where('user_id', $user->id)->latest()->first();
-
-        if (! $sub || ! $sub->isPremium()) {
+        if (! SubscriptionAccess::isPremium($user)) {
             return response()->json([
-                'message'     => 'A premium subscription is required to access this feature.',
-                'upgrade_url' => '/premium',
-                'subscription_status' => 'free',
-                'required_tier' => 'premium',
+                'message'             => 'A premium subscription is required to access this feature.',
+                'upgrade_url'         => '/premium',
+                'subscription_status' => SubscriptionAccess::tierFor($user),
+                'required_tier'       => 'premium',
             ], 402);
         }
 

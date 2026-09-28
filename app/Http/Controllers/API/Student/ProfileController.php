@@ -120,13 +120,7 @@ class ProfileController extends Controller
 
         // Subscription gate (skipped when premium billing is disabled globally)
         if (\App\Support\PlatformSettings::bool('enable_premium_subscription')) {
-            $subscription = \App\Models\Subscription::where('user_id', $user->id)
-                ->where('status', 'active')
-                ->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))
-                ->latest()
-                ->first();
-
-            if (! $subscription?->isStandard()) {
+            if (! \App\Support\SubscriptionAccess::isStandard($user)) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Uploading photos requires a Standard or Premium subscription.',

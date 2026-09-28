@@ -12,7 +12,7 @@ class EngagementAnalyticsService
     public function summary(): array
     {
         return [
-            'total_students' => User::where('role', 'student')->count(),
+            'total_students' => User::whereIn('role', ['student', 'alumni'])->count(),
             'total_photos'   => DB::table('photos')->count(),
             'total_messages' => DB::table('messages')->count(),
             'total_tagged'   => DB::table('tagged_photos')->where('status', 'approved')->count(),
@@ -33,18 +33,21 @@ class EngagementAnalyticsService
     public function batchmateStats(User $user): array
     {
         $topProfiles = User::where('batch_id', $user->batch_id)
-            ->where('role', 'student')
+            ->whereIn('role', ['student', 'alumni'])
             ->where('profile_visibility', 'public')
             ->where('id', '!=', $user->id)
             ->orderByDesc('profile_views')
             ->take(5)
-            ->with('studentRecord:id,course,photo')
-            ->get(['id', 'name', 'profile_picture', 'profile_views', 'student_record_id'])
+            ->with('studentRecord:id,course,graduation_year,photo')
+            ->get(['id', 'name', 'profile_picture', 'profile_views', 'student_record_id', 'role'])
             ->map(fn($u) => [
                 'id'              => $u->id,
                 'name'            => $u->name,
-                'profile_picture' => $u->profile_picture, 
-                'course'          => $u->course,           
+                'profile_picture' => $u->profile_picture,
+                'course'          => $u->course,
+                'batch'           => $u->batch,
+                'graduation_year' => $u->graduation_year,
+                'role'            => $u->role,
                 'views'           => $u->profile_views,
             ]);
 
@@ -57,19 +60,20 @@ class EngagementAnalyticsService
     public function topViewed(int $limit = 10): array
     {
         // Use Eloquent + eager-load studentRecord so accessors work.
-        return User::where('role', 'student')
+        return User::whereIn('role', ['student', 'alumni'])
             ->where('profile_visibility', 'public')
             ->orderByDesc('profile_views')
             ->take($limit)
             ->with('studentRecord:id,course,graduation_year,photo')
-            ->get(['id', 'name', 'profile_picture', 'profile_views', 'student_record_id'])
+            ->get(['id', 'name', 'profile_picture', 'profile_views', 'student_record_id', 'role'])
             ->map(fn($u) => [
                 'id'              => $u->id,
                 'name'            => $u->name,
-                'profile_picture' => $u->profile_picture,  
-                'course'          => $u->course,            
-                'batch'           => $u->batch,             
-                'graduation_year' => $u->graduation_year,   
+                'profile_picture' => $u->profile_picture,
+                'course'          => $u->course,
+                'batch'           => $u->batch,
+                'graduation_year' => $u->graduation_year,
+                'role'            => $u->role,
                 'views'           => $u->profile_views,
             ])
             ->toArray();
@@ -85,6 +89,7 @@ class EngagementAnalyticsService
                 DB::raw('COUNT(*) as views_this_week'),
                 'users.name',
                 'users.profile_picture',
+                'users.role',
                 'students.course',
                 'students.graduation_year as batch',
                 'students.graduation_year',
@@ -94,12 +99,13 @@ class EngagementAnalyticsService
             ->leftJoin('students', 'students.id', '=', 'users.student_record_id')
             ->where('profile_views.created_at', '>=', now()->subDays(7))
             ->where('users.profile_visibility', 'public')
-            ->where('users.role', 'student')
+            ->whereIn('users.role', ['student', 'alumni'])
             ->whereNull('users.deleted_at')
             ->groupBy(
                 'profile_views.viewed_user_id',
                 'users.name',
                 'users.profile_picture',
+                'users.role',
                 'students.course',
                 'students.graduation_year',
                 'users.profile_views'

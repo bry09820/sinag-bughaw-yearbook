@@ -149,6 +149,8 @@ class User extends Authenticatable
         'profile_picture',
         'department',
         'is_premium',
+        'is_subscribed',
+        'tier',
         'posts_count',
         'tagged_count',
     ];
@@ -221,9 +223,40 @@ class User extends Authenticatable
     {
         return $this->subscriptions()
             ->where('status', 'active')
-            ->where(fn($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))
-            ->latest()
+            ->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))
+            ->latest('id')
             ->first();
+    }
+
+    public function subscriptionTier(): string
+    {
+        return \App\Support\SubscriptionAccess::tierFor($this);
+    }
+
+    public function hasPremiumAccess(): bool
+    {
+        return \App\Support\SubscriptionAccess::isPremium($this);
+    }
+
+    public function hasStandardAccess(): bool
+    {
+        return \App\Support\SubscriptionAccess::isStandard($this);
+    }
+
+    public function getIsPremiumAttribute(): bool
+    {
+        return $this->hasPremiumAccess();
+    }
+
+    public function getIsSubscribedAttribute(): bool
+    {
+        return \App\Support\SubscriptionAccess::isSubscribed($this);
+    }
+
+    public function getTierAttribute(): string
+    {
+        // Always resolve from SubscriptionAccess so Navbar/Directory/Analytics stay in sync.
+        return $this->subscriptionTier();
     }
 
     public function getStudentIdAttribute(): ?string
@@ -372,12 +405,6 @@ class User extends Authenticatable
     public function getDepartmentAttribute(): ?string
     {
         return self::getDepartment($this->course ?? '');
-    }
-
-    public function getIsPremiumAttribute(): bool
-    {
-        $sub = $this->activeSubscription();
-        return $sub?->isPremium() ?? false;
     }
 
     public function isSsoUser(): bool

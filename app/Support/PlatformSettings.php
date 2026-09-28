@@ -3,7 +3,9 @@
 namespace App\Support;
 
 use App\Models\Setting;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Log;
 
 class PlatformSettings
 {
@@ -111,11 +113,19 @@ class PlatformSettings
 
     public static function all(): array
     {
-        $stored = Setting::query()
-            ->whereIn('key', self::ALLOWED_KEYS)
-            ->pluck('value', 'key');
+        try {
+            $stored = Setting::query()
+                ->whereIn('key', self::ALLOWED_KEYS)
+                ->pluck('value', 'key');
 
-        return array_merge(self::DEFAULTS, $stored->all());
+            return array_merge(self::DEFAULTS, $stored->all());
+        } catch (QueryException $e) {
+            Log::warning('PlatformSettings::all failed; using defaults', [
+                'message' => $e->getMessage(),
+            ]);
+
+            return self::DEFAULTS;
+        }
     }
 
     public static function publicConfig(): array
@@ -132,7 +142,16 @@ class PlatformSettings
     {
         $fallback = $default ?? self::DEFAULTS[$key] ?? '';
 
-        return (string) (Setting::getValue($key, $fallback) ?? $fallback);
+        try {
+            return (string) (Setting::getValue($key, $fallback) ?? $fallback);
+        } catch (QueryException $e) {
+            Log::warning('PlatformSettings::get failed; using default', [
+                'key'     => $key,
+                'message' => $e->getMessage(),
+            ]);
+
+            return (string) $fallback;
+        }
     }
 
     public static function bool(string $key): bool

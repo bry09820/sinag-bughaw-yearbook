@@ -14,7 +14,6 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Link }                                      from 'react-router-dom';
 import { useAuth }                                   from '@/features/auth/hooks/useAuth';
-import { useAppConfig }                              from '@/features/platform/AppConfigProvider';
 import { searchApi }                                 from '@/api/search.api';
 import { profileApi }                                from '@/api/profile.api';
 import { storageUrl }                                from '@/api/client';
@@ -22,14 +21,10 @@ import axios                                         from '@/api/client';
 import Navbar                                        from '@/components/layout/Navbar';
 import Footer                                        from '@/components/layout/Footer';
 import LoadingSkeleton                               from '@/components/ui/LoadingSkeleton';
+import { getSubscriptionTier }                       from '@/utils/subscription';
 
 // Tier helper
-const getTier = (user) => {
-  if (!user) return 'free';
-  if (user.tier === 'premium' || user.is_premium) return 'premium';
-  if (user.tier === 'standard') return 'standard';
-  return 'free';
-};
+const getTier = (user) => getSubscriptionTier(user);
 
 const firstValue = (source, keys = []) => {
   for (const key of keys) {
@@ -847,8 +842,7 @@ function RightSidebar({ batchmates, batchStats, topViewed, currentUser, memories
 // Feed skeleton
 // Main page
 export default function DashboardPage() {
-  const { user }    = useAuth();
-  const { isOn }    = useAppConfig();
+  const { user } = useAuth();
 
   const [filter,      setFilter]      = useState('all');
   const [posts,       setPosts]       = useState([]);
@@ -1009,99 +1003,88 @@ export default function DashboardPage() {
 
       <main className="flex-1 max-w-[1400px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
 
-        {/* Top search bar */}
-        <div className="flex items-center gap-4 mb-6">
-          <div className="flex-1 max-w-xl relative z-50" ref={searchRef}>
-            <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none" />
-            <input
-              type="text"
-              value={query}
-              onChange={e => onSearch(e.target.value)}
-              placeholder="Search students, faculty, or content…"
-              className="w-full pl-11 pr-4 py-3 text-sm rounded-xl bg-white border border-slate-200
-                         text-[#1d2b4b] placeholder-slate-400 outline-none shadow-sm
-                         focus:border-[#3f51b5] focus:ring-2 focus:ring-[#3f51b5]/20 transition"
-            />
+        {/* Balanced 3-col: spacer | feed | sidebar — keeps feed (and search) truly centered */}
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,260px)_minmax(0,680px)_minmax(0,260px)] xl:grid-cols-[minmax(0,280px)_minmax(0,680px)_minmax(0,280px)] gap-6 items-start justify-center">
 
-            {showDrop && (
-              <div className="absolute w-full mt-2 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden z-50">
-                {results?.faculty?.length > 0 && (
-                  <>
-                    <p className="px-4 py-2 text-[10px] font-bold tracking-widest uppercase text-[#3f51b5] bg-slate-50 m-0">Faculty</p>
-                    {results.faculty.map(f => (
-                      <Link key={f.id} to="/faculty"
-                        className="flex items-center gap-3 px-4 py-2.5 no-underline hover:bg-slate-50 border-b border-slate-50 transition-colors">
-                        <img
-                          src={`https://ui-avatars.com/api/?name=${encodeURIComponent(f.name)}&background=1d2b4b&color=fff`}
-                          className="w-8 h-8 rounded-lg object-cover flex-shrink-0" alt={f.name}
-                        />
-                        <div>
-                          <p className="text-[13px] font-semibold text-[#1d2b4b] m-0">{f.name}</p>
-                          <p className="text-[11px] text-slate-400 m-0">{f.title ?? 'Faculty'}</p>
-                        </div>
-                      </Link>
-                    ))}
-                  </>
-                )}
-                {results?.students?.length > 0 && (
-                  <>
-                    <p className="px-4 py-2 text-[10px] font-bold tracking-widest uppercase text-amber-600 bg-slate-50 m-0">Students</p>
-                    {results.students.map(s => (
-                      <Link key={s.id} to={`/students/${s.id}`}
-                        className="flex items-center gap-3 px-4 py-2.5 no-underline hover:bg-slate-50 border-b border-slate-50 transition-colors">
-                        <img
-                          src={storageUrl(s.profile_picture) || `https://ui-avatars.com/api/?name=${encodeURIComponent(s.name)}&background=3f51b5&color=fff`}
-                          className="w-8 h-8 rounded-lg object-cover flex-shrink-0" alt={s.name}
-                        />
-                        <div>
-                          <p className="text-[13px] font-semibold text-[#1d2b4b] m-0">{s.name}</p>
-                          <p className="text-[11px] text-slate-400 m-0">Pioneer Student</p>
-                        </div>
-                      </Link>
-                    ))}
-                  </>
-                )}
-                {!results?.faculty?.length && !results?.students?.length && (
-                  <p className="py-5 text-center text-sm text-slate-400">No results found.</p>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Welcome greeting */}
-          <div className="hidden lg:block ml-auto text-right">
-            <p className="text-[11px] text-slate-400 m-0 tracking-widest uppercase">Mabuhay, Pioneer!</p>
-            <p className="text-[15px] font-extrabold text-[#1d2b4b] m-0">
-              Welcome back, <span className="text-[#3f51b5]">{user?.name?.split(' ')[0]}</span>
-            </p>
-          </div>
-        </div>
-
-        {/* 3-column layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,640px)_260px] xl:grid-cols-[minmax(0,680px)_280px] gap-6 items-start justify-center">
-
-          {/* Left sidebar */}
-          <div className="hidden">
-            <LeftSidebar user={user} isOn={isOn} />
-          </div>
+          {/* Left spacer — mirrors right sidebar width so the feed column sits dead-center */}
+          <div className="hidden lg:block" aria-hidden="true" />
 
           {/* Feed column */}
-          <div className="min-w-0 w-full max-w-[680px]">
-            {/* Filter tabs */}
-            <div className="flex items-center gap-2 mb-5 flex-wrap">
-              {FILTERS.map(({ key, label }) => (
-                <button
-                  key={key}
-                  onClick={() => setFilter(key)}
-                  className={`text-[12px] font-semibold px-4 py-2 rounded-full border transition-all cursor-pointer
-                    ${filter === key
-                      ? 'bg-[#1d2b4b] text-[#fdb813] border-[#1d2b4b]'
-                      : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300 hover:text-slate-700'
-                    }`}
-                >
-                  {label}
-                </button>
-              ))}
+          <div className="min-w-0 w-full max-w-[680px] mx-auto">
+            {/* Search + filters — forced center, matching post card width */}
+            <div className="mx-auto flex flex-col items-center w-full max-w-[680px]">
+              <div className="w-full mb-5 relative z-50" ref={searchRef}>
+                <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none" />
+                <input
+                  type="text"
+                  value={query}
+                  onChange={e => onSearch(e.target.value)}
+                  placeholder="Search students, faculty, or content…"
+                  className="w-full pl-11 pr-4 py-3 text-sm rounded-xl bg-white border border-slate-200
+                             text-[#1d2b4b] placeholder-slate-400 outline-none shadow-sm
+                             focus:border-[#3f51b5] focus:ring-2 focus:ring-[#3f51b5]/20 transition"
+                />
+
+                {showDrop && (
+                  <div className="absolute w-full mt-2 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden z-50">
+                    {results?.faculty?.length > 0 && (
+                      <>
+                        <p className="px-4 py-2 text-[10px] font-bold tracking-widest uppercase text-[#3f51b5] bg-slate-50 m-0">Faculty</p>
+                        {results.faculty.map(f => (
+                          <Link key={f.id} to="/faculty"
+                            className="flex items-center gap-3 px-4 py-2.5 no-underline hover:bg-slate-50 border-b border-slate-50 transition-colors">
+                            <img
+                              src={`https://ui-avatars.com/api/?name=${encodeURIComponent(f.name)}&background=1d2b4b&color=fff`}
+                              className="w-8 h-8 rounded-lg object-cover flex-shrink-0" alt={f.name}
+                            />
+                            <div>
+                              <p className="text-[13px] font-semibold text-[#1d2b4b] m-0">{f.name}</p>
+                              <p className="text-[11px] text-slate-400 m-0">{f.title ?? 'Faculty'}</p>
+                            </div>
+                          </Link>
+                        ))}
+                      </>
+                    )}
+                    {results?.students?.length > 0 && (
+                      <>
+                        <p className="px-4 py-2 text-[10px] font-bold tracking-widest uppercase text-amber-600 bg-slate-50 m-0">Students</p>
+                        {results.students.map(s => (
+                          <Link key={s.id} to={`/students/${s.id}`}
+                            className="flex items-center gap-3 px-4 py-2.5 no-underline hover:bg-slate-50 border-b border-slate-50 transition-colors">
+                            <img
+                              src={storageUrl(s.profile_picture) || `https://ui-avatars.com/api/?name=${encodeURIComponent(s.name)}&background=3f51b5&color=fff`}
+                              className="w-8 h-8 rounded-lg object-cover flex-shrink-0" alt={s.name}
+                            />
+                            <div>
+                              <p className="text-[13px] font-semibold text-[#1d2b4b] m-0">{s.name}</p>
+                              <p className="text-[11px] text-slate-400 m-0">Pioneer Student</p>
+                            </div>
+                          </Link>
+                        ))}
+                      </>
+                    )}
+                    {!results?.faculty?.length && !results?.students?.length && (
+                      <p className="py-5 text-center text-sm text-slate-400">No results found.</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-center gap-2 mb-5 flex-wrap w-full">
+                {FILTERS.map(({ key, label }) => (
+                  <button
+                    key={key}
+                    onClick={() => setFilter(key)}
+                    className={`text-[12px] font-semibold px-4 py-2 rounded-full border transition-all cursor-pointer
+                      ${filter === key
+                        ? 'bg-[#1d2b4b] text-[#fdb813] border-[#1d2b4b]'
+                        : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300 hover:text-slate-700'
+                      }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Posts */}
@@ -1150,7 +1133,13 @@ export default function DashboardPage() {
           </div>
 
           {/* Right sidebar */}
-          <div className="hidden lg:block">
+          <div className="hidden lg:block w-full max-w-[280px]">
+            <div className="mb-5 text-right">
+              <p className="text-[11px] text-slate-400 m-0 tracking-widest uppercase">Mabuhay, Pioneer!</p>
+              <p className="text-[15px] font-extrabold text-[#1d2b4b] m-0">
+                Welcome back, <span className="text-[#3f51b5]">{user?.name?.split(' ')[0]}</span>
+              </p>
+            </div>
             <RightSidebar
               batchmates={batchmates}
               topViewed={topViewed}

@@ -9,6 +9,7 @@ interface FaceRecognition
 {
     public function isEnabled(): bool;
     public function indexStudent(User $user): array;
+    public function indexStudentFromBytes(User $user, string $bytes): array;
     public function indexPhoto(string $imageUrl, string $externalImageId): array;
     public function syncStudents(iterable $students): array;
     public function analyzePhoto(string $disk, string $path): array;

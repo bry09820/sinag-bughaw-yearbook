@@ -760,6 +760,16 @@ export const getConversations = async () => {
   return response.data;
 };
 
+export const searchMessageUsers = async (params = {}) => {
+  const response = await api.get("/messages/search", { params });
+  return response.data;
+};
+
+export const startMessageConversation = async (userId) => {
+  const response = await api.post("/messages/start", { user_id: userId });
+  return response.data;
+};
+
 export const getMessageThread = async (userId) => {
   const response = await api.get(`/messages/${userId}`);
   return response.data;

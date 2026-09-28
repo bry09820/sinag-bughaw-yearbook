@@ -11,6 +11,7 @@ use App\Services\AI\AwsRekognitionFaceRecognition;
 use App\Services\Notification\BrevoMailService;
 use App\Services\Storage\CloudinaryService;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -28,16 +29,13 @@ class AppServiceProvider extends ServiceProvider
             ]);
         });
 
-        // Storage / Cloudinary 
+        // Storage / Cloudinary (credentials only via config/cloudinary.php)
         $this->app->singleton(StorageServiceInterface::class, function () {
-            $cloudName = config('services.cloudinary.cloud_name')
-                        ?? env('CLOUDINARY_CLOUD_NAME');
-            $apiKey    = config('services.cloudinary.api_key')
-                        ?? env('CLOUDINARY_API_KEY');
-            $apiSecret = config('services.cloudinary.api_secret')
-                        ?? env('CLOUDINARY_API_SECRET');
-
-            if (empty($cloudName) || empty($apiKey) || empty($apiSecret)) {
+            if (
+                ! config('cloudinary.cloud_name')
+                || ! config('cloudinary.api_key')
+                || ! config('cloudinary.api_secret')
+            ) {
                 return new \App\Services\Storage\LocalStorageService();
             }
 
@@ -58,9 +56,13 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // Hostinger / shared hosting sits behind a reverse proxy — force HTTPS URLs in production.
+        if ($this->app->environment('production')) {
+            URL::forceScheme('https');
+        }
+
         Photo::observe(PhotoObserver::class);
 
-        // Policies 
         Gate::policy(Photo::class, PhotoPolicy::class);
     }
 }

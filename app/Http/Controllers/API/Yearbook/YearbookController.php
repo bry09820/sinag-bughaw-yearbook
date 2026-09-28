@@ -515,9 +515,7 @@ class YearbookController extends Controller
             return true;
         }
 
-        $subscription = Subscription::where('user_id', $user->id)->latest()->first();
-
-        return ! $subscription?->isPremium();
+        return ! \App\Support\SubscriptionAccess::isPremium($user);
     }
 
     private function yearbookScopeLabel(array $scope): ?string

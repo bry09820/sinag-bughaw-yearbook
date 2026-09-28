@@ -3,7 +3,9 @@ import api from './client';
 export const messagesApi = {
   conversations: ()                     => api.get('/messages/conversations'),
   unreadCount:   ()                     => api.get('/messages/unread-count'),
-  participant:    (userId)              => api.get(`/messages/users/${userId}`),
+  searchUsers:   (params = {})          => api.get('/messages/search', { params }),
+  start:         (userId)               => api.post('/messages/start', { user_id: userId }),
+  participant:   (userId)               => api.get(`/messages/users/${userId}`),
   thread:        (userId)               => api.get(`/messages/${userId}`),
   send:          (receiverId, body, image = null) => {
     if (image) {
@@ -29,21 +31,15 @@ export const presenceApi = {
 };
 
 export const voiceNotesApi = {
-  // Received (approved) notes
   inbox:      ()         => api.get('/voice-notes/inbox'),
-  // Sent notes (all statuses pending / approved / rejected)
   outbox:     ()         => api.get('/voice-notes/outbox'),
-  // Notes shown on a student's public profile
   forProfile: (userId)   => api.get(`/voice-notes/profile/${userId}`),
-  // Send a voice note to a classmate
   send:       (formData) => api.post('/voice-notes', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   }),
-  // Sender deletes their own note
   delete:     (id)       => api.delete(`/voice-notes/${id}`),
 };
 
-// Admin API (only used in admin panel)
 export const voiceNoteAdminApi = {
   list:    (status = 'pending') => api.get('/admin/voice-notes', { params: { status } }),
   stats:   ()                   => api.get('/admin/voice-notes/stats'),
