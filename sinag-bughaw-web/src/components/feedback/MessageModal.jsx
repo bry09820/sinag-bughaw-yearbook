@@ -35,7 +35,7 @@ function getPalette(name = '') {
 function resolveAvatar(picture) {
   if (!picture) return null;
   if (picture.startsWith('http')) return picture;
-  return `${import.meta.env.VITE_APP_URL ?? 'http://127.0.0.1:8000'}/storage/${picture}`;
+  return `${import.meta.env.VITE_APP_URL || ''}/storage/${picture}`;
 }
 
 function resolveRecipientId(student) {

@@ -1,10 +1,10 @@
 import axios from 'axios';
 
-// VITE_API_URL already includes /api  e.g. http://127.0.0.1:8000/api
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
+// VITE_API_URL already includes /api  e.g. https://example.com/api
+const BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 // Storage URL is the root (no /api)
-const STORAGE_ROOT = import.meta.env.VITE_APP_URL || 'http://127.0.0.1:8000';
+const STORAGE_ROOT = import.meta.env.VITE_APP_URL || '';
 
 /** Convert a relative storage path to a full URL */
 export function storageUrl(path) {

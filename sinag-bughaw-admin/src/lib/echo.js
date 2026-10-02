@@ -12,7 +12,7 @@ function getToken() {
   );
 }
 
-const apiUrl = import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:8000';
+const apiUrl = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '').replace(/\/api$/, '');
 
 const echo = new Echo({
   broadcaster: 'pusher',

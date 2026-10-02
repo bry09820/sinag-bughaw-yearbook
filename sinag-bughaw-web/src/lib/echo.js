@@ -4,8 +4,8 @@ import Pusher from 'pusher-js';
 window.Pusher = Pusher;
 
 const apiRoot = (import.meta.env.VITE_APP_URL
-  ?? import.meta.env.VITE_API_URL?.replace(/\/api\/?$/, '')
-  ?? 'http://127.0.0.1:8000'
+  || import.meta.env.VITE_API_URL?.replace(/\/api\/?$/, '')
+  || ''
 ).replace(/\/+$/, '');
 
 function getToken() {
