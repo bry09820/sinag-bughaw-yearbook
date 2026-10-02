@@ -1,9 +1,9 @@
 #!/usr/bin/env sh
 set -e
 
-APP_PORT="${PORT:-10000}"
-sed -ri -e "s/Listen 80\$/Listen ${APP_PORT}/" /etc/apache2/ports.conf
-sed -ri -e "s/<VirtualHost \*:80>/<VirtualHost *:${APP_PORT}>/" /etc/apache2/sites-available/*.conf
+APP_PORT=10000
+sed -ri -e "s/^Listen [0-9]+\$/Listen ${APP_PORT}/" /etc/apache2/ports.conf
+sed -ri -e "s/<VirtualHost \*:[0-9]+>/<VirtualHost *:${APP_PORT}>/" /etc/apache2/sites-available/000-default.conf
 
 mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache
 
