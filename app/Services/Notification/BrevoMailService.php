@@ -209,7 +209,7 @@ class BrevoMailService
         string $textContent,
         string $context
     ): bool {
-        $mailer = (string) config('mail.default', 'log');
+        $mailer = (string) (config('mail.default') ?: 'smtp');
 
         // Prefer Laravel mail config (log / smtp / brevo / failover).
         if (in_array($mailer, ['log', 'smtp', 'brevo', 'failover'], true)) {
@@ -248,7 +248,7 @@ class BrevoMailService
         ?string $mailerName = null
     ): bool {
         try {
-            $mailerName = $mailerName ?: (string) config('mail.default', 'log');
+            $mailerName = $mailerName ?: (string) (config('mail.default') ?: 'smtp');
             $fromAddress = $this->fromAddress
                 ?: (string) config('mail.from.address', 'noreply@localhost');
             $fromName = $this->fromName

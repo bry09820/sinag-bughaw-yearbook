@@ -8,7 +8,7 @@ return [
     Supported: "reverb", "pusher", "ably", "redis", "log", "null"
     */
 
-    'default' => env('BROADCAST_DRIVER', 'reverb'),
+    'default' => env('BROADCAST_DRIVER') ?: (env('BROADCAST_CONNECTION') ?: 'log'),
 
     /*---------------
     Broadcast Connections

@@ -1,7 +1,8 @@
 <?php
 
 return [
-    'driver' => env('SCOUT_DRIVER', 'meilisearch'),
+    // `?:` so an empty SCOUT_DRIVER="" doesn't resolve to a "" driver (Manager::createDriver() crash).
+    'driver' => env('SCOUT_DRIVER') ?: 'database',
     'prefix' => env('SCOUT_PREFIX', ''),
     'queue'  => env('SCOUT_QUEUE', true),
 
