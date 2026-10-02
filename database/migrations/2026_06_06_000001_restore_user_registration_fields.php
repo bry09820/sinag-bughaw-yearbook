@@ -31,6 +31,11 @@ return new class extends Migration
             DB::statement(
                 "ALTER TABLE users MODIFY profile_visibility ENUM('public','batchmates','alumni_only','private') NOT NULL DEFAULT 'public'"
             );
+        } elseif (DB::getDriverName() === 'pgsql') {
+            DB::statement('ALTER TABLE users DROP CONSTRAINT IF EXISTS users_profile_visibility_check');
+            DB::statement(
+                "ALTER TABLE users ADD CONSTRAINT users_profile_visibility_check CHECK (profile_visibility IN ('public','batchmates','alumni_only','private'))"
+            );
         }
     }
 
@@ -39,6 +44,11 @@ return new class extends Migration
         if (DB::getDriverName() === 'mysql') {
             DB::statement(
                 "ALTER TABLE users MODIFY profile_visibility ENUM('public','alumni_only','private') NOT NULL DEFAULT 'public'"
+            );
+        } elseif (DB::getDriverName() === 'pgsql') {
+            DB::statement('ALTER TABLE users DROP CONSTRAINT IF EXISTS users_profile_visibility_check');
+            DB::statement(
+                "ALTER TABLE users ADD CONSTRAINT users_profile_visibility_check CHECK (profile_visibility IN ('public','alumni_only','private'))"
             );
         }
 
