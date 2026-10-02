@@ -15,14 +15,16 @@ class BrevoMailService
 
     public function __construct()
     {
-        $this->apiKey = config('brevo.api_key');
+        $this->apiKey = config('brevo.api_key') ?: env('BREVO_API_KEY');
         $this->fromAddress = (string) (
             config('brevo.from_address')
+            ?: env('BREVO_FROM_ADDRESS')
             ?: config('mail.from.address')
             ?: ''
         );
         $this->fromName = (string) (
             config('brevo.from_name')
+            ?: env('BREVO_FROM_NAME')
             ?: config('mail.from.name')
             ?: 'Sinag-Bughaw'
         );
@@ -248,13 +250,15 @@ class BrevoMailService
             $fromName = $this->fromName
                 ?: (string) config('mail.from.name', 'Sinag-Bughaw');
 
-            \Illuminate\Support\Facades\Mail::mailer($mailerName)
-                ->html($htmlContent, function ($message) use ($toEmail, $toName, $subject, $textContent, $fromAddress, $fromName) {
-                    $message->to($toEmail, $toName)
-                        ->from($fromAddress, $fromName)
-                        ->subject($subject)
-                        ->text($textContent);
-                });
+            /** @var \Illuminate\Mail\Mailer $mailer */
+            $mailer = \Illuminate\Support\Facades\Mail::mailer($mailerName);
+
+            $mailer->html($htmlContent, function (\Illuminate\Mail\Message $message) use ($toEmail, $toName, $subject, $textContent, $fromAddress, $fromName) {
+                $message->to($toEmail, $toName)
+                    ->from($fromAddress, $fromName)
+                    ->subject($subject)
+                    ->text($textContent);
+            });
 
             Log::info("Mail ({$context}) sent via [{$mailerName}] to {$toEmail}: {$textContent}");
             return true;
@@ -320,7 +324,10 @@ class BrevoMailService
         }
 
         try {
-            \Illuminate\Support\Facades\Mail::mailer('brevo')->html($htmlContent, function ($message) use ($toEmail, $toName, $subject, $textContent) {
+            /** @var \Illuminate\Mail\Mailer $mailer */
+            $mailer = \Illuminate\Support\Facades\Mail::mailer('brevo');
+
+            $mailer->html($htmlContent, function (\Illuminate\Mail\Message $message) use ($toEmail, $toName, $subject, $textContent) {
                 $message->to($toEmail, $toName)
                     ->from($this->fromAddress, $this->fromName)
                     ->subject($subject)
