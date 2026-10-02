@@ -22,6 +22,8 @@ services:
         sync: false
       - key: CORS_ALLOWED_ORIGINS
         sync: false
+      - key: BROADCAST_CONNECTION
+        value: log
 
       # Supabase Postgres: use the Session pooler (IPv4); the direct host is IPv6-only and unreachable from Render.
       - key: DB_CONNECTION
