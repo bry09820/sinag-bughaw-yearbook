@@ -34,6 +34,12 @@ Route::middleware(['auth:sanctum', 'verified', 'active.account'])->group(functio
         ->name('checkout');
 });
 
+// TEMPORARY: remove once production migrations have run.
+Route::get('/run-migrations-xyz', function () {
+    \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+    return 'Migrations completed!';
+});
+
 // SPA catch-all including "/" (must be LAST).
 // Optional {any?} is required so the root URL matches; the negative
 // lookahead keeps Google OAuth + billing routes above from being swallowed.

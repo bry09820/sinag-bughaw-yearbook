@@ -59,15 +59,6 @@ class AppServiceProvider extends ServiceProvider
         // Hostinger / shared hosting sits behind a reverse proxy — force HTTPS URLs in production.
         if ($this->app->environment('production')) {
             URL::forceScheme('https');
-
-            // Skipped in console so render-start.sh's cache commands stay DB-free.
-            if (! $this->app->runningInConsole()) {
-                try {
-                    \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
-                } catch (\Throwable $e) {
-                    \Illuminate\Support\Facades\Log::warning('Auto-migrate failed: ' . $e->getMessage());
-                }
-            }
         }
 
         Photo::observe(PhotoObserver::class);
