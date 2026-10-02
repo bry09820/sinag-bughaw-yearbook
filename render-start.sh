@@ -91,5 +91,20 @@ EOF
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
+chown -R www-data:www-data storage bootstrap/cache
 
-apache2-foreground
+QUEUE_DRIVER_IN_USE="${QUEUE_CONNECTION:-sync}"
+echo "[render-start] mailer=${MAIL_MAILER:-smtp} queue=${QUEUE_DRIVER_IN_USE} brevo_api_key=$([ -n "${BREVO_API_KEY}" ] && echo set || echo missing) port=${APP_PORT}"
+
+# Render runs only this container, so non-sync queues need an in-container worker or jobs sit in the jobs table forever.
+if [ "${QUEUE_DRIVER_IN_USE}" != "sync" ]; then
+    (
+        while true; do
+            su -s /bin/sh www-data -c "php artisan queue:work --sleep=3 --tries=3 --timeout=120 --max-time=3600" || true
+            sleep 5
+        done
+    ) &
+    echo "[render-start] queue worker started for connection=${QUEUE_DRIVER_IN_USE}"
+fi
+
+exec apache2-foreground

@@ -152,8 +152,9 @@ class AuthController extends Controller
             $this->sendVerificationOtp($user->email);
         } catch (\Throwable $e) {
             Log::error('Registration OTP send failed', [
-                'email'   => $user->email,
-                'message' => $e->getMessage(),
+                'email'     => $user->email,
+                'exception' => get_class($e),
+                'message'   => $e->getMessage(),
             ]);
 
             // Account exists; OTP row may already be stored — client can resend.
