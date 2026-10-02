@@ -52,6 +52,9 @@ RUN sed -ri -e 's!/var/www/html!/var/www/html/public!g' \
     /etc/apache2/apache2.conf \
     /etc/apache2/conf-available/*.conf
 
-EXPOSE 80
+# Palitan ang port ng Apache para sumunod sa PORT ng Render (fallback sa 10000)
+RUN sed -ri -e 's/:80/:${PORT:-10000}/g' /etc/apache2/sites-available/*.conf /etc/apache2/ports.conf
+
+EXPOSE 10000
 
 CMD ["./render-start.sh"]
