@@ -53,6 +53,27 @@ class AuthController extends Controller
             'consent_accepted' => 'required|accepted',
         ]);
 
+        try {
+            return $this->createRegisteredUser($request);
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            Log::error('Registration failed', [
+                'email'     => $request->email,
+                'exception' => get_class($e),
+                'message'   => $e->getMessage(),
+                'file'      => $e->getFile() . ':' . $e->getLine(),
+            ]);
+
+            return response()->json([
+                'message' => 'Registration failed: ' . $e->getMessage(),
+                'error'   => class_basename($e),
+            ], 500);
+        }
+    }
+
+    private function createRegisteredUser(Request $request)
+    {
         $studentRecord = $this->findMatchingStudentRecord($request);
 
         if ($studentRecord && $studentRecord->hasRegistered()) {
@@ -94,19 +115,19 @@ class AuthController extends Controller
                 'consent_accepted'  => true,
                 'email_verified'    => false,
             ]);
-        } catch (\Throwable $e) {
-            Log::error('Registration failed', [
-                'email'   => $request->email,
-                'message' => $e->getMessage(),
-            ]);
-
-            throw $e;
         } finally {
             User::enableSearchSyncing();
         }
 
         if ($studentRecord && filled($studentRecord->photo)) {
-            ProcessFaceIndexing::dispatch($user->fresh()->load('studentRecord'));
+            try {
+                ProcessFaceIndexing::dispatch($user->fresh()->load('studentRecord'));
+            } catch (\Throwable $e) {
+                Log::warning('Face indexing dispatch failed during registration', [
+                    'user_id' => $user->id,
+                    'message' => $e->getMessage(),
+                ]);
+            }
         }
 
         try {
