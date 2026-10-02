@@ -211,19 +211,8 @@ class BrevoMailService
     ): bool {
         $mailer = (string) (config('mail.default') ?: 'smtp');
 
-        // Prefer Laravel mail config (log / smtp / brevo / failover).
-        if (in_array($mailer, ['log', 'smtp', 'brevo', 'failover'], true)) {
-            if ($this->sendViaLaravelMailer($toEmail, $toName, $subject, $htmlContent, $textContent, $context, $mailer)) {
-                return true;
-            }
-
-            // Never leave OTP delivery completely dead during local/mobile testing.
-            if ($mailer !== 'log' && $this->sendViaLaravelMailer($toEmail, $toName, $subject, $htmlContent, $textContent, $context, 'log')) {
-                Log::warning("Mail ({$context}) fell back to log driver for {$toEmail}");
-                return true;
-            }
-
-            return false;
+        if (in_array($mailer, ['log', 'array'], true)) {
+            return $this->sendViaLaravelMailer($toEmail, $toName, $subject, $htmlContent, $textContent, $context, $mailer);
         }
 
         if (! $this->fromAddress) {
@@ -231,8 +220,13 @@ class BrevoMailService
             return false;
         }
 
+        // HTTPS API first: Render free instances block outbound SMTP ports 25/465/587.
         if ($this->apiKey && $this->sendViaApi($toEmail, $toName, $subject, $htmlContent, $textContent, $context)) {
             return true;
+        }
+
+        if (config("mail.mailers.{$mailer}")) {
+            return $this->sendViaLaravelMailer($toEmail, $toName, $subject, $htmlContent, $textContent, $context, $mailer);
         }
 
         return $this->sendViaSmtp($toEmail, $toName, $subject, $htmlContent, $textContent, $context);
