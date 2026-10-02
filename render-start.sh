@@ -88,12 +88,6 @@ FACE_SERVICE_URL="${FACE_SERVICE_URL}"
 WHISPER_SERVICE_URL="${WHISPER_SERVICE_URL}"
 EOF
 
-php artisan config:clear
-php artisan route:clear
-php artisan view:clear
-
-php artisan db:seed --class=SettingsSeeder --force
-
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
